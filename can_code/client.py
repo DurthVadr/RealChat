@@ -68,21 +68,22 @@ class VoiceChatClient:
 
     def receive_voice_message(self):
         def play_audio():
-            while True:
-                try:
+            try:
+                self.play_stream = self.audio.open(format=FORMAT, channels=CHANNELS,
+                                                   rate=RATE, output=True,
+                                                   frames_per_buffer=CHUNK)
+                while True:
                     data = self.client_socket.recv(1024)
                     if not data:
+                        print("No more data to play. Stopping...")
                         break
 
-                    self.play_stream = self.audio.open(format=FORMAT, channels=CHANNELS,
-                                                       rate=RATE, output=True,
-                                                       frames_per_buffer=CHUNK)
                     self.play_stream.write(data)
-                    self.play_stream.stop_stream()
-                    self.play_stream.close()
-                except socket.error as e:
-                    print(f"Socket error: {e}")
-                    break
+            except socket.error as e:
+                print(f"Socket error: {e}")
+            finally:
+                self.play_stream.stop_stream()
+                self.play_stream.close()
 
         receive_thread = threading.Thread(target=play_audio)
         receive_thread.start()
