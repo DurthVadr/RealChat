@@ -7,7 +7,7 @@ import pickle
 import sounddevice as sd
 import numpy as np
 
-host = "192.168.1.196"
+host = "10.200.111.191"
 port = 9999
 
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

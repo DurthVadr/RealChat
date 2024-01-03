@@ -1,7 +1,7 @@
 import socket
 
 
-HOST = '10.200.86.151'  # Put your IP or 'localhost'
+HOST = '10.200.111.191'  # Put your IP or 'localhost'
 PORT = 65432  # Port
 
 # Create a socket

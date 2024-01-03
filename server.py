@@ -5,7 +5,7 @@ import pickle
 import bcrypt
 import threading
 
-host = "192.168.1.196"
+host = "10.200.111.191"
 port = 9999
 
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -163,6 +163,6 @@ def authenticate_user(username, password):
 
 if __name__ == "__main__":
     try:
-        receive()
+        receive(server_stop_event)
     finally:
         stop_server()

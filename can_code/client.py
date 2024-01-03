@@ -8,7 +8,7 @@ CHANNELS = 1
 RATE = 44100
 RECORD_SECONDS = 5
 
-HOST = '10.200.86.151'  # Put the server's IP or hostname
+HOST = '10.200.111.191'  # Put the server's IP or hostname
 PORT = 65432  # Port
 
 # Create a socket
