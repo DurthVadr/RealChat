@@ -10,7 +10,7 @@ RATE = 44100
 
 HOST = '192.168.1.101'
 PORT = 65432
-
+#sa
 class VoiceChatClient:
     def __init__(self, root):
         self.root = root
