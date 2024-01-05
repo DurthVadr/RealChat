@@ -2,7 +2,7 @@ import socket
 
 import threading
 
-HOST = '192.168.1.101'
+HOST = '10.200.111.191'
 PORT = 65432
 
 class VoiceChatServer:
@@ -37,8 +37,23 @@ class VoiceChatServer:
                 # Handle disconnection or errors
                 break
 
-        self.clients.remove(client_socket)
+        self.remove_client(client_socket)
         client_socket.close()
+
+    def remove_client(self, client_socket):
+        if client_socket in self.clients:
+            self.clients.remove(client_socket)
+            print(f"Client {client_socket.getpeername()} disconnected.")
+            self.broadcast_disconnect_message(client_socket)
+
+    def broadcast_disconnect_message(self, disconnected_socket):
+        disconnect_msg = "User has disconnected"
+        for client in self.clients:
+            if client != disconnected_socket:
+                try:
+                    client.sendall(disconnect_msg.encode())
+                except Exception as e:
+                    print(f"Error broadcasting disconnect message: {e}")
 
     def broadcast_shared_history(self):
         for client in self.clients:
