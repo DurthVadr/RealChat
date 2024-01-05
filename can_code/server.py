@@ -11,6 +11,7 @@ class VoiceChatServer:
         self.clients = []
         self.shared_history = []
         self.rooms = {}
+        self.room_passwords = {}
         #self.rooms = []
 
     def start_server(self):
@@ -33,15 +34,20 @@ class VoiceChatServer:
                 if not data:
                     break
 
+                decoded_data = data.decode()
                 # Handle room-related commands from clients
-                if data.startswith(b"CREATE_ROOM"):
-                    room_name = data.split(b":")[1].decode()
-                    self.create_room(room_name, client_socket)
-                elif data == b"GET_ROOMS":
+                if decoded_data.startswith("CREATE_ROOM"):
+                    room_name, password = decoded_data.split(":")[1:]
+                    self.create_room(room_name, client_socket, password)
+                elif decoded_data == "GET_ROOMS":
                     client_socket.sendall(str(list(self.rooms.keys())).encode())
-                elif data.startswith(b"JOIN_ROOM"):
-                    room_name = data.split(b":")[1].decode()
-                    self.join_room(room_name, client_socket)
+                elif decoded_data.startswith("JOIN_ROOM"):
+                    room_name, password = decoded_data.split(":")[1:]
+                    if not self.join_room(room_name, client_socket, password):
+                        client_socket.sendall(b"WRONG_PASSWORD")
+                        print(f"Incorrect password for room '{room_name}'")
+                    else:
+                        self.show_voice_messaging_page(client_socket)
                 else:
                     self.broadcast_voice_message(data, client_socket)
 
@@ -52,23 +58,30 @@ class VoiceChatServer:
         self.remove_client(client_socket)
         client_socket.close()
 
-    def create_room(self, room_name, client_socket):
-        # Logic to create a room with the given name
+    def create_room(self, room_name, client_socket, password=None):
         if room_name not in self.rooms:
-            self.rooms[room_name] = [client_socket]
+            self.rooms[room_name] = {"clients": [client_socket], "password": password}
+            print(f"Room '{room_name}' created.")
+            return True
         else:
-            self.rooms[room_name].append(client_socket)
-        
-        #print(f"Room '{room_name}' created. Clients: {self.rooms[room_name]}")
-        print(f"Room '{room_name}' created.")
+            print(f"Room '{room_name}' already exists.")
+            return False
 
-    def join_room(self, room_name, client_socket):
-        # Logic to join a client to a specified room
+    def join_room(self, room_name, client_socket, password=None):
         if room_name in self.rooms:
-            self.rooms[room_name].append(client_socket)
-            print(f"Client joined room '{room_name}'. Clients: {self.rooms[room_name]}")
+            if not password:
+                return False  # Password is required; reject if no password given
+
+            if self.rooms[room_name]["password"] == password:
+                self.rooms[room_name]["clients"].append(client_socket)
+                print(f"Client joined room '{room_name}'. Clients: {self.rooms[room_name]['clients']}")
+                return True
+            else:
+                return False  # Incorrect password; reject client
         else:
             print(f"Room '{room_name}' does not exist.")
+            return False
+
 
     def get_room_of_client(self, client_socket):
         for room, clients in self.rooms.items():

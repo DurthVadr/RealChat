@@ -37,6 +37,7 @@ class VoiceChatClient:
         self.listen_button = None
         self.play_selected_button = None
         self.history_display = None
+        self.password = None
 
         self.connection_frame.pack()
 
@@ -92,7 +93,7 @@ class VoiceChatClient:
         self.main_frame.pack_forget()
         self.room_frame.pack()
 
-        self.create_room_button = tk.Button(self.room_frame, text="Create Room", command=self.create_room)
+        self.create_room_button = tk.Button(self.room_frame, text="Create Room", command=self.create_room_with_password)
         self.create_room_button.pack()
 
         self.join_room_button = tk.Button(self.room_frame, text="Join Room", command=self.join_room)
@@ -107,23 +108,63 @@ class VoiceChatClient:
         self.rooms_display = tk.Listbox(self.room_frame, height=10, width=40)
         self.rooms_display.pack()  # Make sure it's packed within the main_frame
 
+        # Room name entry
+        self.room_name_label = tk.Label(self.room_frame, text="Room Name:")
+        self.room_name_label.pack()
         self.room_name_entry = tk.Entry(self.room_frame)
         self.room_name_entry.pack()
 
-    def create_room(self):
-        room_name = self.room_name_entry.get()
-        if room_name:
-            self.client_socket.sendall(f"CREATE_ROOM:{room_name}".encode())
+        # Password entry
+        self.password_label = tk.Label(self.room_frame, text="Password:")
+        self.password_label.pack()
+        self.password_entry = tk.Entry(self.room_frame, show="*")  # Password entry with hidden characters
+        self.password_entry.pack()
+
+    def ask_for_password(self, room_name):
+        self.password_page = tk.Toplevel()
+        self.password_page.title(f"Password for {room_name}")
+        
+        self.room_name_label = tk.Label(self.password_page, text=f"Room: {room_name}")
+        self.room_name_label.pack()
+
+        self.password_label = tk.Label(self.password_page, text="Enter password:")
+        self.password_label.pack()
+
+        self.password_entry = tk.Entry(self.password_page, show="*")
+        self.password_entry.pack()
+
+        self.submit_password_button = tk.Button(self.password_page, text="Submit", command=lambda: self.submit_password(room_name))
+        self.submit_password_button.pack()
+
+    def submit_password(self, room_name):
+        password = self.password_entry.get()
+        if password:
+            self.password = password
+            self.client_socket.send(f"JOIN_ROOM:{room_name}:{self.password}".encode())
+            self.show_voice_messaging_page()  # Show the voice messaging page after successful password submission
+            self.password_page.destroy()
         else:
-            print("Please enter a room name.")
+            # Handle no password provided
+            pass
+
+    def create_room_with_password(self):
+        room_name = self.room_name_entry.get()
+        password = self.password_entry.get()
+
+        if room_name and password:
+            self.client_socket.sendall(f"CREATE_ROOM:{room_name}:{password}".encode())
+        else:
+            print("Please enter both room name and password.")
 
     def join_room(self):
         selected_index = self.rooms_display.curselection()
         if selected_index:
             room_name = self.rooms_display.get(selected_index)
-            message = f"JOIN_ROOM:{room_name}"
-            self.client_socket.sendall(message.encode())
-            self.show_voice_messaging_page()
+            password = self.ask_for_password(room_name)
+            if password:
+                message = f"JOIN_ROOM:{room_name}:{password}"
+                self.client_socket.sendall(message.encode())
+                self.show_voice_messaging_page()
 
     def show_voice_messaging_page(self):
         self.room_frame.pack_forget()  # Hide the room selection page
