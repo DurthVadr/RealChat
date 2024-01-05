@@ -70,6 +70,12 @@ class VoiceChatServer:
         else:
             print(f"Room '{room_name}' does not exist.")
 
+    def get_room_of_client(self, client_socket):
+        for room, clients in self.rooms.items():
+            if client_socket in clients:
+                return room
+        return None
+
     def remove_client(self, client_socket):
         # Logic to remove a client from rooms upon disconnection
         for room, clients in self.rooms.items():
@@ -99,13 +105,16 @@ class VoiceChatServer:
         self.shared_history.append(new_message)  # Add new message to shared history list
         self.broadcast_shared_history()  # Broadcast updated shared history to all clients
 
-    def broadcast_voice_message(self, audio_data, sender_socket):
-        for client in self.clients:
-            if client != sender_socket:
-                try:
-                    client.sendall(audio_data)
-                except Exception as e:
-                    print(f"Error broadcasting message: {e}")
+    def broadcast_voice_message(self, data, client_socket):
+        current_room = self.get_room_of_client(client_socket)
+
+        if current_room:
+            for client in self.rooms[current_room]:
+                if client != client_socket:
+                    try:
+                        client.sendall(data)
+                    except Exception as e:
+                        print(f"Error broadcasting message: {e}")
 
 def main():
     server = VoiceChatServer()
