@@ -9,6 +9,8 @@ CHANNELS = 1
 RATE = 44100
 
 HOST = '10.200.111.191'
+#10.200.111.191
+#13.49.243.37
 PORT = 65432
 
 
@@ -121,6 +123,11 @@ class VoiceChatClient:
             room_name = self.rooms_display.get(selected_index)
             message = f"JOIN_ROOM:{room_name}"
             self.client_socket.sendall(message.encode())
+            self.show_voice_messaging_page()
+
+    def show_voice_messaging_page(self):
+        self.room_frame.pack_forget()  # Hide the room selection page
+        self.main_frame.pack()  # Show the voice messaging page
 
     def refresh_rooms(self):
         try:

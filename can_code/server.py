@@ -33,15 +33,14 @@ class VoiceChatServer:
                 if not data:
                     break
 
-                decoded_data = data.decode()
                 # Handle room-related commands from clients
-                if decoded_data.startswith("CREATE_ROOM"):
-                    room_name = decoded_data.split(":")[1]
+                if data.startswith(b"CREATE_ROOM"):
+                    room_name = data.split(b":")[1].decode()
                     self.create_room(room_name, client_socket)
-                elif decoded_data == "GET_ROOMS":
+                elif data == b"GET_ROOMS":
                     client_socket.sendall(str(list(self.rooms.keys())).encode())
-                elif decoded_data.startswith("JOIN_ROOM"):
-                    room_name = decoded_data.split(":")[1]
+                elif data.startswith(b"JOIN_ROOM"):
+                    room_name = data.split(b":")[1].decode()
                     self.join_room(room_name, client_socket)
                 else:
                     self.broadcast_voice_message(data, client_socket)
@@ -70,6 +69,12 @@ class VoiceChatServer:
             print(f"Client joined room '{room_name}'. Clients: {self.rooms[room_name]}")
         else:
             print(f"Room '{room_name}' does not exist.")
+
+    def get_room_of_client(self, client_socket):
+        for room, clients in self.rooms.items():
+            if client_socket in clients:
+                return room
+        return None
 
     def remove_client(self, client_socket):
         # Logic to remove a client from rooms upon disconnection
@@ -100,13 +105,16 @@ class VoiceChatServer:
         self.shared_history.append(new_message)  # Add new message to shared history list
         self.broadcast_shared_history()  # Broadcast updated shared history to all clients
 
-    def broadcast_voice_message(self, audio_data, sender_socket):
-        for client in self.clients:
-            if client != sender_socket:
-                try:
-                    client.sendall(audio_data)
-                except Exception as e:
-                    print(f"Error broadcasting message: {e}")
+    def broadcast_voice_message(self, data, client_socket):
+        current_room = self.get_room_of_client(client_socket)
+
+        if current_room:
+            for client in self.rooms[current_room]:
+                if client != client_socket:
+                    try:
+                        client.sendall(data)
+                    except Exception as e:
+                        print(f"Error broadcasting message: {e}")
 
 def main():
     server = VoiceChatServer()
