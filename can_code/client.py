@@ -8,10 +8,11 @@ FORMAT = pyaudio.paInt16
 CHANNELS = 1
 RATE = 44100
 
-HOST = '10.200.111.191'
+# HOST = '13.49.67.178'
+HOST = '16.171.22.65'
 #10.200.111.191
 #13.49.243.37
-PORT = 65432
+PORT = 65432 
 
 
 class VoiceChatClient:
