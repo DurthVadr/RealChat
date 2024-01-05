@@ -2,7 +2,7 @@ import socket
 
 import threading
 
-HOST = '10.200.111.191'
+HOST = socket.gethostbyname(socket.gethostname())
 PORT = 65432
 
 class VoiceChatServer:
