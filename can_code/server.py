@@ -33,15 +33,14 @@ class VoiceChatServer:
                 if not data:
                     break
 
-                decoded_data = data.decode()
                 # Handle room-related commands from clients
-                if decoded_data.startswith("CREATE_ROOM"):
-                    room_name = decoded_data.split(":")[1]
+                if data.startswith(b"CREATE_ROOM"):
+                    room_name = data.split(b":")[1].decode()
                     self.create_room(room_name, client_socket)
-                elif decoded_data == "GET_ROOMS":
+                elif data == b"GET_ROOMS":
                     client_socket.sendall(str(list(self.rooms.keys())).encode())
-                elif decoded_data.startswith("JOIN_ROOM"):
-                    room_name = decoded_data.split(":")[1]
+                elif data.startswith(b"JOIN_ROOM"):
+                    room_name = data.split(b":")[1].decode()
                     self.join_room(room_name, client_socket)
                 else:
                     self.broadcast_voice_message(data, client_socket)
