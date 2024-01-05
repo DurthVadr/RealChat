@@ -16,14 +16,18 @@ class VoiceChatClient:
     def __init__(self, root):
         self.root = root
         self.root.title("Voice Chat Client")
-
         self.connection_frame = tk.Frame(self.root)
-        self.connection_frame.pack()
-
         self.main_frame = tk.Frame(self.root)
+        self.room_frame = tk.Frame(self.root)
 
         self.connect_button = tk.Button(self.connection_frame, text="Connect", command=self.connect_to_server)
         self.connect_button.pack()
+
+        '''self.create_room_button = None
+        self.join_room_button = None
+        self.room_listbox = None
+        self.room_name_entry = None
+        self.room_selected_index = None '''
 
         self.client_socket = None
         self.disconnect_button = None
@@ -31,6 +35,8 @@ class VoiceChatClient:
         self.listen_button = None
         self.play_selected_button = None
         self.history_display = None
+
+        self.connection_frame.pack()
 
     def connect_to_server(self):
         if self.disconnect_button:
@@ -44,8 +50,8 @@ class VoiceChatClient:
         if self.history_display:
             self.history_display.destroy()
 
-        self.connection_frame.pack_forget()  # Hide the connection frame
-        self.main_frame.pack()  # Show the main frame
+        self.connection_frame.pack_forget()
+        self.main_frame.pack()
 
         self.disconnect_button = tk.Button(self.main_frame, text="Disconnect", command=self.disconnect_from_server, state=tk.NORMAL)
         self.disconnect_button.pack()
@@ -66,9 +72,10 @@ class VoiceChatClient:
 
         try:
             self.client_socket.connect((HOST, PORT))
+            self.show_room_selection()
         except Exception as e:
             print(f"Error connecting to server: {e}")
-            self.disconnect_from_server()  # Ensure proper cleanup if connection fails
+            self.disconnect_from_server()
 
         self.audio = pyaudio.PyAudio()
 
@@ -79,6 +86,57 @@ class VoiceChatClient:
 
         self.history_display.bind('<<ListboxSelect>>', self.on_select)
 
+    def show_room_selection(self):
+        self.main_frame.pack_forget()
+        self.room_frame.pack()
+
+        self.create_room_button = tk.Button(self.room_frame, text="Create Room", command=self.create_room)
+        self.create_room_button.pack()
+
+        self.join_room_button = tk.Button(self.room_frame, text="Join Room", command=self.join_room)
+        self.join_room_button.pack()
+
+        self.refresh_button = tk.Button(self.room_frame, text="Refresh", command=self.refresh_rooms)
+        self.refresh_button.pack()
+
+        '''self.room_listbox = tk.Listbox(self.room_frame, height=10, width=40)
+        self.room_listbox.pack()'''
+
+        self.rooms_display = tk.Listbox(self.room_frame, height=10, width=40)
+        self.rooms_display.pack()  # Make sure it's packed within the main_frame
+
+        self.room_name_entry = tk.Entry(self.room_frame)
+        self.room_name_entry.pack()
+
+    def create_room(self):
+        room_name = self.room_name_entry.get()
+        if room_name:
+            self.client_socket.sendall(f"CREATE_ROOM:{room_name}".encode())
+        else:
+            print("Please enter a room name.")
+
+    def join_room(self):
+        selected_index = self.rooms_display.curselection()
+        if selected_index:
+            room_name = self.rooms_display.get(selected_index)
+            message = f"JOIN_ROOM:{room_name}"
+            self.client_socket.sendall(message.encode())
+
+    def refresh_rooms(self):
+        try:
+            self.client_socket.sendall("GET_ROOMS".encode())
+            rooms_list = self.client_socket.recv(1024).decode()
+            self.display_rooms(rooms_list)
+        except Exception as e:
+            print(f"Error refreshing rooms: {e}")
+
+    def display_rooms(self, rooms_list):
+        self.rooms_display.delete(0, tk.END)
+        rooms = rooms_list.strip("[]").split(", ")  # Remove square brackets and split
+        for room in rooms:
+            # Remove single quotes from the room name and insert into the listbox
+            self.rooms_display.insert(tk.END, room.strip("'"))
+
     def on_select(self, event):
         selected_idx = self.history_display.curselection()
         if selected_idx:
@@ -86,12 +144,6 @@ class VoiceChatClient:
             self.play_selected_button.config(state=tk.NORMAL)
 
     def disconnect_from_server(self):
-        self.connect_button.config(state=tk.NORMAL)
-        self.disconnect_button.config(state=tk.DISABLED)
-        self.record_button.config(state=tk.DISABLED)
-        self.listen_button.config(state=tk.DISABLED)
-        self.play_selected_button.config(state=tk.DISABLED)
-
         if self.client_socket:
             try:
                 self.client_socket.shutdown(socket.SHUT_RDWR)
@@ -101,19 +153,17 @@ class VoiceChatClient:
             finally:
                 self.client_socket = None
 
-        self.main_frame.pack_forget()  # Hide the main frame
-        self.connection_frame.pack()  # Show the connection frame
+        self.room_frame.pack_forget()
+        self.connection_frame.pack()
 
     def send_voice_message(self):
         if self.client_socket:
             try:
-                self.stream = self.audio.open(format=FORMAT, channels=CHANNELS,
-                                              rate=RATE, input=True,
-                                              frames_per_buffer=CHUNK)
+                self.stream = self.audio.open(format=pyaudio.paInt16, channels=1, rate=44100, input=True, frames_per_buffer=1024)
 
                 frames = []
-                for i in range(0, int(RATE / CHUNK * 6)):
-                    data = self.stream.read(CHUNK)
+                for _ in range(0, int(44100 / 1024 * 6)):
+                    data = self.stream.read(1024)
                     frames.append(data)
 
                 audio_data = b''.join(frames)
@@ -130,9 +180,7 @@ class VoiceChatClient:
     def receive_voice_message(self):
         def play_audio():
             try:
-                self.play_stream = self.audio.open(format=FORMAT, channels=CHANNELS,
-                                                   rate=RATE, output=True,
-                                                   frames_per_buffer=CHUNK)
+                self.play_stream = self.audio.open(format=pyaudio.paInt16, channels=1, rate=44100, output=True, frames_per_buffer=1024)
                 while True:
                     data = self.client_socket.recv(1024)
                     if not data:
@@ -152,16 +200,15 @@ class VoiceChatClient:
 
     def update_history_display(self):
         self.history_display.delete(0, tk.END)
-        for idx, message in enumerate(self.sent_messages):
+        for idx, _ in enumerate(self.sent_messages):
             self.history_display.insert(idx, f"Message {idx + 1}")
 
     def play_selected_audio(self):
-        if self.selected_message_index is not None:
+        selected_index = self.history_display.curselection()
+        if selected_index:
             try:
-                selected_audio = self.sent_messages[self.selected_message_index]
-                self.play_stream = self.audio.open(format=FORMAT, channels=CHANNELS,
-                                                   rate=RATE, output=True,
-                                                   frames_per_buffer=CHUNK)
+                selected_audio = self.sent_messages[selected_index[0]]
+                self.play_stream = self.audio.open(format=pyaudio.paInt16, channels=1, rate=44100, output=True, frames_per_buffer=1024)
                 self.play_stream.write(selected_audio)
                 self.play_stream.stop_stream()
                 self.play_stream.close()
@@ -169,7 +216,6 @@ class VoiceChatClient:
                 print("Invalid selection")
             finally:
                 self.selected_message_index = None
-                self.play_selected_button.config(state=tk.DISABLED)
 
 
 def main():

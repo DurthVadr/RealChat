@@ -10,6 +10,8 @@ class VoiceChatServer:
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.clients = []
         self.shared_history = []
+        self.rooms = {}
+        #self.rooms = []
 
     def start_server(self):
         self.server_socket.bind((HOST, PORT))
@@ -31,7 +33,18 @@ class VoiceChatServer:
                 if not data:
                     break
 
-                self.broadcast_voice_message(data, client_socket)
+                decoded_data = data.decode()
+                # Handle room-related commands from clients
+                if decoded_data.startswith("CREATE_ROOM"):
+                    room_name = decoded_data.split(":")[1]
+                    self.create_room(room_name, client_socket)
+                elif decoded_data == "GET_ROOMS":
+                    client_socket.sendall(str(list(self.rooms.keys())).encode())
+                elif decoded_data.startswith("JOIN_ROOM"):
+                    room_name = decoded_data.split(":")[1]
+                    self.join_room(room_name, client_socket)
+                else:
+                    self.broadcast_voice_message(data, client_socket)
 
             except ConnectionResetError:
                 # Handle disconnection or errors
@@ -40,11 +53,32 @@ class VoiceChatServer:
         self.remove_client(client_socket)
         client_socket.close()
 
+    def create_room(self, room_name, client_socket):
+        # Logic to create a room with the given name
+        if room_name not in self.rooms:
+            self.rooms[room_name] = [client_socket]
+        else:
+            self.rooms[room_name].append(client_socket)
+        
+        #print(f"Room '{room_name}' created. Clients: {self.rooms[room_name]}")
+        print(f"Room '{room_name}' created.")
+
+    def join_room(self, room_name, client_socket):
+        # Logic to join a client to a specified room
+        if room_name in self.rooms:
+            self.rooms[room_name].append(client_socket)
+            print(f"Client joined room '{room_name}'. Clients: {self.rooms[room_name]}")
+        else:
+            print(f"Room '{room_name}' does not exist.")
+
     def remove_client(self, client_socket):
+        # Logic to remove a client from rooms upon disconnection
+        for room, clients in self.rooms.items():
+            if client_socket in clients:
+                clients.remove(client_socket)
+                print(f"Client disconnected from room. Room '{room}' clients: {self.rooms[room]}")
         if client_socket in self.clients:
             self.clients.remove(client_socket)
-            print(f"Client {client_socket.getpeername()} disconnected.")
-            self.broadcast_disconnect_message(client_socket)
 
     def broadcast_disconnect_message(self, disconnected_socket):
         disconnect_msg = "User has disconnected"
