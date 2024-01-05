@@ -1,41 +1,70 @@
 import socket
+import threading
+import rsa
 import pyaudio
 import tkinter as tk
-import threading
+from tkinter import Entry, Label, Button, StringVar
 
 CHUNK = 1024
 FORMAT = pyaudio.paInt16
 CHANNELS = 1
 RATE = 44100
 
-HOST = '192.168.1.101'
+HOST = '192.168.1.196' # The server's hostname or IP address aman dikkat
 PORT = 65432
-#sa
+
 class VoiceChatClient:
     def __init__(self, root):
         self.root = root
         self.root.title("Voice Chat Client")
 
-        self.connect_button = tk.Button(self.root, text="Connect", command=self.connect_to_server)
+        self.connect_button = Button(self.root, text="Connect", command=self.connect_to_server)
         self.connect_button.pack()
 
-        self.disconnect_button = tk.Button(self.root, text="Disconnect", command=self.disconnect_from_server, state=tk.DISABLED)
+        self.disconnect_button = Button(self.root, text="Disconnect", command=self.disconnect_from_server, state=tk.DISABLED)
         self.disconnect_button.pack()
 
-        self.record_button = tk.Button(self.root, text="Record/Send", command=self.send_voice_message, state=tk.DISABLED)
+        self.record_button = Button(self.root, text="Record/Send", command=self.send_voice_message, state=tk.DISABLED)
         self.record_button.pack()
 
-        self.listen_button = tk.Button(self.root, text="Listen/Receive", command=self.receive_voice_message, state=tk.DISABLED)
+        self.listen_button = Button(self.root, text="Listen/Receive", command=self.receive_voice_message, state=tk.DISABLED)
         self.listen_button.pack()
 
-        self.play_selected_button = tk.Button(self.root, text="Play Selected Audio", command=self.play_selected_audio, state=tk.DISABLED)
+        self.play_selected_button = Button(self.root, text="Play Selected Audio", command=self.play_selected_audio, state=tk.DISABLED)
         self.play_selected_button.pack()
 
         self.history_display = tk.Listbox(self.root, height=10, width=40)
         self.history_display.pack()
 
+        self.chatroom_name_entry = Entry(self.root)
+        self.chatroom_name_entry.pack()
+
+        self.chatroom_password_entry = Entry(self.root, show="*")
+        self.chatroom_password_entry.pack()
+
+        self.create_chatroom_button = Button(self.root, text="Create Chatroom", command=self.create_chatroom, state=tk.DISABLED)
+        self.create_chatroom_button.pack()
+
+        self.join_chatroom_button = Button(self.root, text="Join Chatroom", command=self.join_chatroom, state=tk.DISABLED)
+        self.join_chatroom_button.pack()
+
+        self.admin_var = StringVar()
+        self.admin_checkbox = tk.Checkbutton(self.root, text="Admin", variable=self.admin_var)
+        self.admin_checkbox.pack()
+
+        self.username_entry = Entry(self.root)
+        self.username_entry.pack()
+
+        self.password_entry = Entry(self.root, show="*")
+        self.password_entry.pack()
+
+        self.register_button = Button(self.root, text="Register", command=self.register_user, state=tk.DISABLED)
+        self.register_button.pack()
+
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        
+        self.server_public_key = None  # Server's public key for encryption
+        self.private_key = rsa.newkeys(1024).private_key()  # Client's private key
+
         self.audio = pyaudio.PyAudio()
 
         self.stream = None
@@ -56,14 +85,34 @@ class VoiceChatClient:
         self.disconnect_button.config(state=tk.NORMAL)
         self.record_button.config(state=tk.NORMAL)
         self.listen_button.config(state=tk.NORMAL)
+        self.create_chatroom_button.config(state=tk.NORMAL)
+        self.join_chatroom_button.config(state=tk.NORMAL)
+        self.register_button.config(state=tk.NORMAL)
 
         self.client_socket.connect((HOST, PORT))
+
+        # Receive and store the server's public key
+        self.server_public_key = rsa.PublicKey.load_pkcs1(self.client_socket.recv(1024))
+
+        # Send additional info to identify if this client is the admin or a user
+        is_admin = "admin" if self.admin_var.get() else "user"
+        self.client_socket.sendall(is_admin.encode())
+
+        if not self.admin_var.get():
+            # Send username and password for user registration
+            username = self.username_entry.get()
+            password = self.password_entry.get()
+            self.client_socket.sendall(username.encode())
+            self.client_socket.sendall(password.encode())
 
     def disconnect_from_server(self):
         self.connect_button.config(state=tk.NORMAL)
         self.disconnect_button.config(state=tk.DISABLED)
         self.record_button.config(state=tk.DISABLED)
         self.listen_button.config(state=tk.DISABLED)
+        self.create_chatroom_button.config(state=tk.DISABLED)
+        self.join_chatroom_button.config(state=tk.DISABLED)
+        self.register_button.config(state=tk.DISABLED)
 
         self.client_socket.close()
 
@@ -124,6 +173,29 @@ class VoiceChatClient:
             finally:
                 self.selected_message_index = None
                 self.play_selected_button.config(state=tk.DISABLED)  # Disable the button after playing
+
+    def create_chatroom(self):
+        chatroom_name = self.chatroom_name_entry.get()
+        password = self.chatroom_password_entry.get()
+        command = f"/create_chatroom {chatroom_name} {password}"
+        self.send_command(command)
+
+    def join_chatroom(self):
+        chatroom_name = self.chatroom_name_entry.get()
+        password = self.chatroom_password_entry.get()
+        command = f"/join_chatroom {chatroom_name} {password}"
+        self.send_command(command)
+
+    def register_user(self):
+        username = self.username_entry.get()
+        password = self.password_entry.get()
+        command = f"/register {username} {password}"
+        self.send_command(command)
+
+    def send_command(self, command):
+        # Encrypt the command with the server's public key
+        encrypted_command = rsa.encrypt(command.encode(), self.server_public_key)
+        self.client_socket.sendall(encrypted_command)
 
 def main():
     root = tk.Tk()
