@@ -30,9 +30,13 @@ class VoiceChatServer:
             client_socket, addr = self.server_socket.accept()
             print(f"Connected by {addr}")
             self.clients.append(client_socket)
+            self.connected_clients.add(addr[0])
 
             client_thread = threading.Thread(target=self.handle_client, args=(client_socket,))
             client_thread.start()
+
+            online_clients_thread = threading.Thread(target=self.get_online_clients, args=(client_socket,))
+            online_clients_thread.start()
 
     def handle_client(self, client_socket):
         while True:
@@ -49,6 +53,15 @@ class VoiceChatServer:
 
         self.remove_client(client_socket)
         client_socket.close()
+
+    def get_online_clients(self, requesting_client):
+        online_clients = list(self.connected_clients - {requesting_client.getpeername()[0]})
+        online_clients_str = ",".join(online_clients)
+        try:
+            requesting_client.sendall(online_clients_str.encode())
+        except Exception as e:
+            print(f"Error sending online clients list: {e}")
+
 
     def remove_client(self, client_socket):
         if client_socket in self.clients:

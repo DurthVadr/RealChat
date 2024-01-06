@@ -62,6 +62,12 @@ class VoiceChatClient:
         self.history_display = tk.Listbox(self.main_frame, height=10, width=40)
         self.history_display.pack()
 
+        self.refresh_button = tk.Button(self.main_frame, text="Refresh", command=self.refresh_online_clients)
+        self.refresh_button.pack()
+
+        self.online_clients_display = tk.Listbox(self.main_frame, height=10, width=40)
+        self.online_clients_display.pack()
+
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         try:
@@ -103,6 +109,19 @@ class VoiceChatClient:
 
         self.main_frame.pack_forget()  # Hide the main frame
         self.connection_frame.pack()  # Show the connection frame
+
+    def refresh_online_clients(self):
+        self.online_clients_display.delete(0, tk.END)  # Clear previous entries
+        
+        try:
+            self.client_socket.sendall(b"GET_ONLINE_CLIENTS")  # Sending request for online clients
+            response = self.client_socket.recv(1024).decode()
+            online_clients = response.split(',')  # Assuming server sends a comma-separated list of IPs
+
+            for client_ip in online_clients:
+                self.online_clients_display.insert(tk.END, client_ip)
+        except Exception as e:
+            print(f"Error fetching online clients: {e}")
 
     def send_voice_message(self):
         if self.client_socket:
