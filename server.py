@@ -3,7 +3,7 @@ import requests
 import threading
 
 HOST = socket.gethostbyname(socket.gethostname())
-#HOST = '192.168.1.101'
+# HOST = '192.168.1.101'
 PORT = 65432
 
 
@@ -47,10 +47,12 @@ class VoiceChatServer:
                 if not data:
                     break
 
-                if data.decode() == "GET_ONLINE_CLIENTS":
-                    self.get_online_clients(client_socket)
-                else:
-                    self.broadcast_voice_message(data, client_socket)
+                if data.startswith(b'CMD:'):
+                    command = data[4:].decode()  # Skip the first 4 bytes ('CMD:') and decode
+                    if command == "GET_ONLINE_CLIENTS":
+                        self.get_online_clients(client_socket)
+                elif data.startswith(b'VOICE:'):
+                    self.broadcast_voice_message(data[6:], client_socket)
 
             except ConnectionResetError:
                 # Handle disconnection or errors

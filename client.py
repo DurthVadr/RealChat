@@ -9,7 +9,9 @@ FORMAT = pyaudio.paInt16
 CHANNELS = 1
 RATE = 44100
 
-HOST = '192.168.1.101'
+HOST = '192.168.1.118'
+# HOST = '16.171.23.85' 
+
 PORT = 65432
 
 
@@ -123,11 +125,11 @@ class VoiceChatClient:
         self.online_clients_display.delete(*self.online_clients_display.get_children())  # Clear previous entries
 
         try:
-            self.client_socket.sendall(b"GET_ONLINE_CLIENTS")  # Sending request for online clients
+            self.client_socket.sendall(b"CMD:GET_ONLINE_CLIENTS")  # Sending request for online clients
             self.client_socket.settimeout(5)  # Set a timeout of 5 seconds for receiving the response
 
             response = self.client_socket.recv(1024).decode()
-            online_clients = response.split(',')  # Assuming server sends a comma-separated list of IPs
+            online_clients = response.split(',') if response else []  # Handle empty response
 
             for idx, client_ip in enumerate(online_clients, start=1):
                 self.online_clients_display.insert("", idx, text=client_ip)
@@ -150,7 +152,7 @@ class VoiceChatClient:
                     data = self.stream.read(CHUNK)
                     frames.append(data)
 
-                audio_data = b''.join(frames)
+                audio_data = b'VOICE:' + b''.join(frames)
                 self.client_socket.sendall(audio_data)
                 self.sent_messages.append(audio_data)
                 self.update_history_display()
