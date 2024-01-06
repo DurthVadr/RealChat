@@ -2,7 +2,8 @@ import socket
 import requests
 import threading
 
-HOST = socket.gethostbyname(socket.gethostname())
+#HOST = socket.gethostbyname(socket.gethostname())
+HOST = '192.168.1.101'
 PORT = 65432
 
 
@@ -19,6 +20,7 @@ class VoiceChatServer:
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.clients = []
         self.shared_history = []
+        self.connected_clients = set()
 
     def start_server(self):
         self.server_socket.bind((HOST, PORT))
@@ -35,8 +37,8 @@ class VoiceChatServer:
             client_thread = threading.Thread(target=self.handle_client, args=(client_socket,))
             client_thread.start()
 
-            online_clients_thread = threading.Thread(target=self.get_online_clients, args=(client_socket,))
-            online_clients_thread.start()
+            #online_clients_thread = threading.Thread(target=self.get_online_clients, args=(client_socket,))
+            #online_clients_thread.start()
 
     def handle_client(self, client_socket):
         while True:
@@ -45,7 +47,10 @@ class VoiceChatServer:
                 if not data:
                     break
 
-                self.broadcast_voice_message(data, client_socket)
+                if data.decode() == "GET_ONLINE_CLIENTS":
+                    self.get_online_clients(client_socket)
+                else:
+                    self.broadcast_voice_message(data, client_socket)
 
             except ConnectionResetError:
                 # Handle disconnection or errors
@@ -54,11 +59,10 @@ class VoiceChatServer:
         self.remove_client(client_socket)
         client_socket.close()
 
-    def get_online_clients(self, requesting_client):
-        online_clients = list(self.connected_clients - {requesting_client.getpeername()[0]})
-        online_clients_str = ",".join(online_clients)
+    def get_online_clients(self, requester_socket):
+        online_clients = ','.join(self.connected_clients)  # Prepare a comma-separated list of connected client IPs
         try:
-            requesting_client.sendall(online_clients_str.encode())
+            requester_socket.sendall(online_clients.encode())  # Send the list to the requester
         except Exception as e:
             print(f"Error sending online clients list: {e}")
 

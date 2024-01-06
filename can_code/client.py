@@ -8,7 +8,7 @@ FORMAT = pyaudio.paInt16
 CHANNELS = 1
 RATE = 44100
 
-HOST = '13.48.25.95'
+HOST = '192.168.1.101'
 PORT = 65432
 
 
@@ -115,13 +115,20 @@ class VoiceChatClient:
         
         try:
             self.client_socket.sendall(b"GET_ONLINE_CLIENTS")  # Sending request for online clients
+            self.client_socket.settimeout(5)  # Set a timeout of 5 seconds for receiving the response
+            
             response = self.client_socket.recv(1024).decode()
             online_clients = response.split(',')  # Assuming server sends a comma-separated list of IPs
 
             for client_ip in online_clients:
                 self.online_clients_display.insert(tk.END, client_ip)
+        except socket.timeout:
+            print("Timeout occurred: No response from the server")
         except Exception as e:
             print(f"Error fetching online clients: {e}")
+        finally:
+            self.client_socket.settimeout(None)  # Resetting the socket timeout to default
+
 
     def send_voice_message(self):
         if self.client_socket:
