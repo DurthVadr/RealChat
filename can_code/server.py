@@ -2,8 +2,8 @@ import socket
 import requests
 import threading
 
-#HOST = socket.gethostbyname(socket.gethostname())
-HOST = '192.168.1.101'
+HOST = socket.gethostbyname(socket.gethostname())
+# HOST = '192.168.1.101'
 PORT = 65432
 
 
