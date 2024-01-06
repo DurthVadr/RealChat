@@ -1,10 +1,19 @@
 import socket
-
+import requests
 import threading
 
-HOST = '10.200.111.191'
+HOST = socket.gethostbyname(socket.gethostname())
 PORT = 65432
 
+
+def get_public_ip():
+    try:
+        response = requests.get('https://api.ipify.org')
+        return response.text
+    except requests.RequestException as e:
+        print(f"Error: {e}")
+        return None
+                            
 class VoiceChatServer:
     def __init__(self):
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -14,7 +23,8 @@ class VoiceChatServer:
     def start_server(self):
         self.server_socket.bind((HOST, PORT))
         self.server_socket.listen()
-        print("Server started, waiting for connections...")
+        public_ip = get_public_ip()
+        print(f"Server started, waiting for connections... public:{public_ip} private:{HOST} port:{PORT}")
 
         while True:
             client_socket, addr = self.server_socket.accept()
