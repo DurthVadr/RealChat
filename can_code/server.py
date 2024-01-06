@@ -45,20 +45,18 @@ class VoiceChatServer:
                 if not data:
                     break
 
-                decoded_data = data.decode()
                 # Handle room-related commands from clients
-                if decoded_data.startswith("CREATE_ROOM"):
-                    room_name, password = decoded_data.split(":")[1:]
+                if data.startswith(b"CREATE_ROOM"):
+                    room_name, password = data[11:].decode().split(b":")
                     self.create_room(room_name, client_socket, password)
-                elif decoded_data == "GET_ROOMS":
+                elif data == b"GET_ROOMS":
                     client_socket.sendall(str(list(self.rooms.keys())).encode())
-                elif decoded_data.startswith("JOIN_ROOM"):
-                    room_name, password = decoded_data.split(":")[1:]
+                elif data.startswith(b"JOIN_ROOM"):
+                    room_name, password = data[9:].decode().split(b":")
                     if not self.join_room(room_name, client_socket, password):
                         client_socket.sendall(b"WRONG_PASSWORD")
                         print(f"Incorrect password for room '{room_name}'")
                     else:
-                        #self.show_voice_messaging_page(client_socket)
                         self.send_message_to_room(room_name, f"User joined room: {client_socket}")
                 else:
                     self.broadcast_voice_message(data, client_socket)
