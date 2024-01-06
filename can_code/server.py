@@ -58,7 +58,8 @@ class VoiceChatServer:
                         client_socket.sendall(b"WRONG_PASSWORD")
                         print(f"Incorrect password for room '{room_name}'")
                     else:
-                        self.show_voice_messaging_page(client_socket)
+                        #self.show_voice_messaging_page(client_socket)
+                        self.send_message_to_room(room_name, f"User joined room: {client_socket}")
                 else:
                     self.broadcast_voice_message(data, client_socket)
 
@@ -68,6 +69,11 @@ class VoiceChatServer:
 
         self.remove_client(client_socket)
         client_socket.close()
+
+    def send_message_to_room(self, room_name, message):
+        if room_name in self.rooms:
+            for client_socket in self.rooms[room_name]["clients"]:
+                client_socket.sendall(message.encode())
 
     def create_room(self, room_name, client_socket, password=None):
         if room_name not in self.rooms:
