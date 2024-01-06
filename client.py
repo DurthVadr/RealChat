@@ -9,7 +9,7 @@ FORMAT = pyaudio.paInt16
 CHANNELS = 1
 RATE = 44100
 
-HOST = '192.168.1.196'
+HOST = '192.168.1.101'
 PORT = 65432
 
 

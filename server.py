@@ -2,8 +2,8 @@ import socket
 import requests
 import threading
 
-#HOST = socket.gethostbyname(socket.gethostname())
-HOST = '192.168.1.196'
+HOST = socket.gethostbyname(socket.gethostname())
+#HOST = '192.168.1.101'
 PORT = 65432
 
 
@@ -70,8 +70,15 @@ class VoiceChatServer:
     def remove_client(self, client_socket):
         if client_socket in self.clients:
             self.clients.remove(client_socket)
-            print(f"Client {client_socket.getpeername()} disconnected.")
+            addr = client_socket.getpeername()
+            print(f"Client {addr} disconnected.")
             self.broadcast_disconnect_message(client_socket)
+
+            # Remove the disconnected client from connected_clients set
+            disconnected_ip = addr[0]
+            if disconnected_ip in self.connected_clients:
+                self.connected_clients.remove(disconnected_ip)
+
 
     def broadcast_disconnect_message(self, disconnected_socket):
         disconnect_msg = "User has disconnected"
