@@ -24,7 +24,7 @@ class VoiceChatServer:
         self.server_socket.bind((HOST, PORT))
         self.server_socket.listen()
         public_ip = get_public_ip()
-        print(f"Server started, waiting for connections... public:{public_ip} private:{HOST} port:{PORT}")
+        print(f"Server started, waiting for connections... public:{public_ip} private:{HOST} port:{PORT} this is branch")
 
         while True:
             client_socket, addr = self.server_socket.accept()
