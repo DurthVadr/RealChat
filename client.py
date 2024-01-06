@@ -1,102 +1,216 @@
-import tkinter as tk
-from tkinter import scrolledtext, Entry, Button, messagebox, simpledialog
 import socket
+import pyaudio
+import tkinter as tk
+from tkinter import ttk
 import threading
-import rsa
-import pickle
-import sounddevice as sd    
-import numpy as np
 
-host = "10.200.111.191"
-port = 9999
+CHUNK = 1024
+FORMAT = pyaudio.paInt16
+CHANNELS = 1
+RATE = 44100
 
-client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-client.connect((host, port))
+HOST = '192.168.1.196'
+PORT = 65432
 
-# Function to send text messages
-def send_text_message():
-    message = message_entry.get()
-    encrypted_message = rsa.encrypt(message.encode("utf-8"), server_public_key)
-    client.send(encrypted_message)
-    message_entry.delete(0, tk.END)
 
-# Function to send voice messages
-def send_voice_message():
-    voice_message = np.array([])
+class VoiceChatClient:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Voice Chat Client")
 
-    def callback(indata, frames, time, status):
-        if status:
-            print(status)
-        voice_message.extend(indata.flatten())
+        # Use ttk style for a more modern look
+        self.style = ttk.Style()
+        self.style.theme_use("clam")  # You can experiment with other themes
 
-    with sd.InputStream(callback=callback):
-        sd.sleep(5000)  # Record for 5 seconds
+        self.connection_frame = ttk.Frame(self.root)
+        self.connection_frame.pack()
 
-    encrypted_voice_message = rsa.encrypt(pickle.dumps(voice_message), server_public_key)
-    client.send(encrypted_voice_message)
+        self.main_frame = ttk.Frame(self.root)
 
-# Function to receive messages
-def receive_messages():
-    while True:
+        self.connect_button = ttk.Button(self.connection_frame, text="Connect", command=self.connect_to_server)
+        self.connect_button.pack()
+
+        self.client_socket = None
+        self.disconnect_button = None
+        self.record_button = None
+        self.listen_button = None
+        self.play_selected_button = None
+        self.history_display = None
+
+    def connect_to_server(self):
+        if self.disconnect_button:
+            self.disconnect_button.destroy()
+        if self.record_button:
+            self.record_button.destroy()
+        if self.listen_button:
+            self.listen_button.destroy()
+        if self.play_selected_button:
+            self.play_selected_button.destroy()
+        if self.history_display:
+            self.history_display.destroy()
+
+        self.connection_frame.pack_forget()  # Hide the connection frame
+        self.main_frame.pack()  # Show the main frame
+
+        # Use ttk.Button for a themed button
+        self.disconnect_button = ttk.Button(self.main_frame, text="Disconnect", command=self.disconnect_from_server, state=tk.NORMAL)
+        self.disconnect_button.pack()
+
+        self.record_button = ttk.Button(self.main_frame, text="Record/Send", command=self.send_voice_message, state=tk.NORMAL)
+        self.record_button.pack()
+
+        self.listen_button = ttk.Button(self.main_frame, text="Listen/Receive", command=self.receive_voice_message, state=tk.NORMAL)
+        self.listen_button.pack()
+
+        self.play_selected_button = ttk.Button(self.main_frame, text="Play Selected Audio", command=self.play_selected_audio, state=tk.NORMAL)
+        self.play_selected_button.pack()
+
+        # Use ttk.Treeview for a more organized display
+        self.history_display = ttk.Treeview(self.main_frame, columns=("Message"))
+        self.history_display.heading("#0", text="History")
+        self.history_display.pack()
+
+        self.refresh_button = ttk.Button(self.main_frame, text="Refresh", command=self.refresh_online_clients)
+        self.refresh_button.pack()
+
+        self.online_clients_display = ttk.Treeview(self.main_frame, columns=("Online Clients"))
+        self.online_clients_display.heading("#0", text="Online Clients")
+        self.online_clients_display.pack()
+
+        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
         try:
-            message = client.recv(4096)
-
-            if not message:
-                break
-
-            if message.startswith(b"-----BEGIN RSA PUBLIC KEY-----"):
-                # Update the server's public key
-                server_public_key = rsa.PublicKey.load_pkcs1(message)
-            else:
-                # Decrypt and display the message
-                decrypted_message = rsa.decrypt(message, client_private_key)
-                chat_text.insert(tk.END, decrypted_message.decode() + "\n")
-                chat_text.yview(tk.END)
-
+            self.client_socket.connect((HOST, PORT))
         except Exception as e:
-            print(e)
-            break
+            print(f"Error connecting to server: {e}")
+            self.disconnect_from_server()  # Ensure proper cleanup if connection fails
 
-# GUI setup
-root = tk.Tk()
-root.title("Chat Application")
+        self.audio = pyaudio.PyAudio()
 
-# Prompt for username and password
-username = simpledialog.askstring("Username", "Enter your username")
-password = simpledialog.askstring("Password", "Enter your password", show='*')
+        self.stream = None
+        self.play_stream = None
+        self.sent_messages = []
+        self.selected_message_index = None
 
-# Send username and password to the server
-client.send(username.encode())
-client.send(password.encode())
+        self.history_display.bind('<ButtonRelease-1>', self.on_select)
 
-# Receive the server's public key
-server_public_key = rsa.PublicKey.load_pkcs1(client.recv(1024))
+    def on_select(self, event):
+        selected_item = self.history_display.focus()
+        if selected_item:
+            self.selected_message_index = int(selected_item) - 1
+            self.play_selected_button.config(state=tk.NORMAL)
 
-# Generate a random private key for the client
-client_public_key, client_private_key = rsa.newkeys(1024)
+    def disconnect_from_server(self):
+        self.connect_button.state(['!disabled'])
+        self.disconnect_button.state(['disabled'])
+        self.record_button.state(['disabled'])
+        self.listen_button.state(['disabled'])
+        self.play_selected_button.state(['disabled'])
 
-# Send the client's public key to the server
-client.send(client_public_key.save_pkcs1())
+        if self.client_socket:
+            try:
+                self.client_socket.shutdown(socket.SHUT_RDWR)
+                self.client_socket.close()
+            except OSError as e:
+                print(f"Error while disconnecting: {e}")
+            finally:
+                self.client_socket = None
 
-# Text area for chat messages
-chat_text = scrolledtext.ScrolledText(root, wrap=tk.WORD, width=40, height=15)
-chat_text.grid(row=0, column=0, columnspan=2)
+        self.main_frame.pack_forget()  # Hide the main frame
+        self.connection_frame.pack()  # Show the connection frame
 
-# Entry for typing messages
-message_entry = Entry(root, width=30)
-message_entry.grid(row=1, column=0, padx=5, pady=5)
+    def refresh_online_clients(self):
+        self.online_clients_display.delete(*self.online_clients_display.get_children())  # Clear previous entries
 
-# Send text message button
-send_text_button = Button(root, text="Send Text", command=send_text_message)
-send_text_button.grid(row=1, column=1, padx=5, pady=5)
+        try:
+            self.client_socket.sendall(b"GET_ONLINE_CLIENTS")  # Sending request for online clients
+            self.client_socket.settimeout(5)  # Set a timeout of 5 seconds for receiving the response
 
-# Send voice message button
-send_voice_button = Button(root, text="Send Voice", command=send_voice_message)
-send_voice_button.grid(row=2, column=0, columnspan=2, pady=5)
+            response = self.client_socket.recv(1024).decode()
+            online_clients = response.split(',')  # Assuming server sends a comma-separated list of IPs
 
-# Start a thread to receive messages
-receive_thread = threading.Thread(target=receive_messages)
-receive_thread.start()
+            for idx, client_ip in enumerate(online_clients, start=1):
+                self.online_clients_display.insert("", idx, text=client_ip)
+        except socket.timeout:
+            print("Timeout occurred: No response from the server")
+        except Exception as e:
+            print(f"Error fetching online clients: {e}")
+        finally:
+            self.client_socket.settimeout(None)  # Resetting the socket timeout to default
 
-# Start the Tkinter main loop
-root.mainloop()
+    def send_voice_message(self):
+        if self.client_socket:
+            try:
+                self.stream = self.audio.open(format=FORMAT, channels=CHANNELS,
+                                              rate=RATE, input=True,
+                                              frames_per_buffer=CHUNK)
+
+                frames = []
+                for i in range(0, int(RATE / CHUNK * 6)):
+                    data = self.stream.read(CHUNK)
+                    frames.append(data)
+
+                audio_data = b''.join(frames)
+                self.client_socket.sendall(audio_data)
+                self.sent_messages.append(audio_data)
+                self.update_history_display()
+            except socket.error as e:
+                print(f"Socket error: {e}")
+            finally:
+                if self.stream:
+                    self.stream.stop_stream()
+                    self.stream.close()
+
+    def receive_voice_message(self):
+        def play_audio():
+            try:
+                self.play_stream = self.audio.open(format=FORMAT, channels=CHANNELS,
+                                                   rate=RATE, output=True,
+                                                   frames_per_buffer=CHUNK)
+                while True:
+                    data = self.client_socket.recv(1024)
+                    if not data:
+                        print("No more data to play. Stopping...")
+                        break
+
+                    self.play_stream.write(data)
+            except socket.error as e:
+                print(f"Socket error: {e}")
+            finally:
+                if self.play_stream:
+                    self.play_stream.stop_stream()
+                    self.play_stream.close()
+
+        receive_thread = threading.Thread(target=play_audio)
+        receive_thread.start()
+
+    def update_history_display(self):
+        self.history_display.delete(*self.history_display.get_children())
+        for idx, message in enumerate(self.sent_messages, start=1):
+            self.history_display.insert("", idx, text=f"Message {idx}")
+
+    def play_selected_audio(self):
+        if self.selected_message_index is not None:
+            try:
+                selected_audio = self.sent_messages[self.selected_message_index]
+                self.play_stream = self.audio.open(format=FORMAT, channels=CHANNELS,
+                                                   rate=RATE, output=True,
+                                                   frames_per_buffer=CHUNK)
+                self.play_stream.write(selected_audio)
+                self.play_stream.stop_stream()
+                self.play_stream.close()
+            except IndexError:
+                print("Invalid selection")
+            finally:
+                self.selected_message_index = None
+                self.play_selected_button.config(state=tk.DISABLED)
+
+
+def main():
+    root = tk.Tk()
+    app = VoiceChatClient(root)
+    root.mainloop()
+
+
+if __name__ == "__main__":
+    main()
