@@ -10,8 +10,8 @@ CHANNELS = 1
 RATE = 44100
 
 # HOST = '192.168.1.101'
-# HOST = '16.171.23.85' 
-HOST = '192.168.1.118'
+HOST = '16.171.20.155' 
+# HOST = '192.168.1.118'
 PORT = 65432
 
 
@@ -153,7 +153,7 @@ class VoiceChatClient:
                     data = self.stream.read(CHUNK)
                     frames.append(data)
 
-                audio_data = b'VOICE:' + b''.join(frames)
+                audio_data = b''.join(frames)
                 self.client_socket.sendall(audio_data)
                 self.sent_messages.append(audio_data)
                 self.update_history_display()
