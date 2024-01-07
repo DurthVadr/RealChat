@@ -13,6 +13,8 @@ class VoiceChatServer:
         self.voice_clients = []  
         self.command_clients = []
         self.lock = threading.Lock()  # Add a lock for thread safety
+        self.whisper_mode = False
+        self.whisper_receiver = None
 
     def start_server(self):
         self.voice_socket.bind((HOST, PORT_VOICE))
@@ -73,6 +75,13 @@ class VoiceChatServer:
                 if command == "GET_ONLINE_CLIENTS":
                     self.get_online_clients(client_socket)
 
+                if command.startswith("WHISPER:"):
+                    receiver_ip = command.split(":")[1]
+                    self.whisper_mode = True
+                    self.whisper_receiver = receiver_ip
+                    print(f"Whisper mode enabled. Receiver: {receiver_ip}")
+
+
             except (ConnectionResetError, BrokenPipeError):
                 break
             
@@ -102,12 +111,21 @@ class VoiceChatServer:
         pass
 
     def broadcast_voice_message(self, audio_data, sender_socket):
-        for client in self.voice_clients:
-            if client != sender_socket:
-                try:
-                    client.sendall(audio_data)
-                except Exception as e:
-                    print(f"Error broadcasting voice message: {e}")
+        if self.whisper_mode:
+
+            receiver_socket = self.find_client_by_id(self.whisper_receiver)
+            if receiver_socket:
+                print(f"Sending whisper message to {receiver_socket.getpeername()[0]}")
+                receiver_socket.sendall(audio_data)
+            self.whisper_mode = False  
+        else: # else broadcasting as normal
+
+            for client in self.voice_clients:
+                if client != sender_socket:
+                    try:
+                        client.sendall(audio_data)
+                    except Exception as e:
+                        print(f"Error broadcasting voice message: {e}")
 
     def get_online_clients(self, requester_socket):
         command_client_addresses = []
@@ -124,7 +142,12 @@ class VoiceChatServer:
         except Exception as e:
             print(f"Error sending online clients list: {e}")
 
-
+    def find_client_by_id(self, client_id):
+        for client_socket in self.voice_clients:
+            if client_socket.getpeername()[0] == client_id:
+                return client_socket
+        return None
+    
 def main():
     server = VoiceChatServer()
     server.start_server()

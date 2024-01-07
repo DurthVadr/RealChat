@@ -36,6 +36,9 @@ class VoiceChatClient:
         self.connect_button = ttk.Button(self.connection_frame, text="Connect", command=self.connect_to_server)
         self.connect_button.pack()
 
+        self.whisper_button = ttk.Button(self.main_frame, text="Whisper", command=self.send_whisper, state=tk.NORMAL)
+        self.whisper_button.pack()
+
         self.client_socket = None
         self.disconnect_button = None
         self.record_button = None
@@ -236,6 +239,35 @@ class VoiceChatClient:
 
     def on_window_close(self): #exts listen even the red exit button on top right is pressed
         self.disconnect_from_server()
+
+    def send_whisper(self):
+        selected_item = self.online_clients_display.focus()
+        if not selected_item:
+            print("No client selected")
+            return
+        
+        receiver_ip = self.online_clients_display.item(selected_item, "text")
+        if receiver_ip:
+            try:
+                self.stream = self.audio.open(format=FORMAT, channels=CHANNELS,
+                                              rate=RATE, input=True,
+                                              frames_per_buffer=CHUNK)
+                frames = []
+                for i in range(0, int(RATE / CHUNK * 6)):
+                    data = self.stream.read(CHUNK)
+                    frames.append(data)
+                    
+                audio_data = b''.join(frames)
+                whisper_command = f"WHISPER:{receiver_ip}".encode()  # Command format
+                self.client_socket_command.sendall(whisper_command)
+                self.client_socket_voice.sendall(audio_data)
+
+            except socket.error as e:
+                print(f"Socket error: {e}")
+            finally:
+                if self.stream:
+                    self.stream.stop_stream()
+                    self.stream.close()
 
 def main():
     root = tk.Tk()
