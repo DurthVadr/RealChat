@@ -33,6 +33,9 @@ class VoiceChatServer:
             print(f"Connected by {addr}")
             self.clients.append(client_socket)
             self.connected_clients.add(addr[0])
+            
+            for client in self.clients:
+                self.get_online_clients(client_socket)
 
             client_thread = threading.Thread(target=self.handle_client, args=(client_socket,))
             client_thread.start()
@@ -47,12 +50,7 @@ class VoiceChatServer:
                 if not data:
                     break
 
-                if data.startswith(b'CMD:'):
-                    command = data[4:].decode()  # Skip the first 4 bytes ('CMD:') and decode
-                    if command == "GET_ONLINE_CLIENTS":
-                        self.get_online_clients(client_socket)
-                elif data.startswith(b'VOICE:'):
-                    self.broadcast_voice_message(data[6:], client_socket)
+                self.broadcast_voice_message(data, client_socket)
 
             except ConnectionResetError:
                 # Handle disconnection or errors
@@ -75,6 +73,11 @@ class VoiceChatServer:
             addr = client_socket.getpeername()
             print(f"Client {addr} disconnected.")
             self.broadcast_disconnect_message(client_socket)
+            
+            for client in self.clients:
+                if client != client_socket:
+                    client.sendall(f"User {addr} has disconnected".encode())
+                    self.get_online_clients(client)
 
             # Remove the disconnected client from connected_clients set
             disconnected_ip = addr[0]
