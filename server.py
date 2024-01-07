@@ -60,17 +60,22 @@ class VoiceChatServer:
             except ConnectionResetError:
                 break
         self.remove_voice_client(client_socket)
-        self.remove_command_client(client_socket)
+       
 
     def handle_command_client(self, client_socket):
         while True:
             try:
                 command = client_socket.recv(1024).decode()
+
+                if not command:
+                    break
+
                 if command == "GET_ONLINE_CLIENTS":
                     self.get_online_clients(client_socket)
-                # Add more command handling if necessary
-            except ConnectionResetError:
+
+            except (ConnectionResetError, BrokenPipeError):
                 break
+            
         self.remove_command_client(client_socket)
 
     def remove_voice_client(self, client_socket):
