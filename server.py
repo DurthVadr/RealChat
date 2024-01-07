@@ -36,6 +36,7 @@ class VoiceChatServer:
             
             for client in self.clients:
                 self.get_online_clients(client_socket)
+                print(client_socket.getpeername())
 
             client_thread = threading.Thread(target=self.handle_client, args=(client_socket,))
             client_thread.start()
@@ -83,6 +84,9 @@ class VoiceChatServer:
             disconnected_ip = addr[0]
             if disconnected_ip in self.connected_clients:
                 self.connected_clients.remove(disconnected_ip)
+
+            print(f"Current connected clients: {self.connected_clients}")
+                
 
 
     def broadcast_disconnect_message(self, disconnected_socket):
