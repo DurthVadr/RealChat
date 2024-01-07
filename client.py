@@ -9,7 +9,7 @@ FORMAT = pyaudio.paInt16
 CHANNELS = 1
 RATE = 44100
 
-HOST = '10.200.111.191'  # Change this to your server's IP
+HOST = '192.168.1.196'  # Change this to your server's IP
 PORT_VOICE = 65431
 PORT_COMMAND = 65432
 
