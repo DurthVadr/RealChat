@@ -3,13 +3,15 @@ import pyaudio
 import tkinter as tk
 from tkinter import ttk
 import threading
+import sys
 
 CHUNK = 1024
 FORMAT = pyaudio.paInt16
 CHANNELS = 1
 RATE = 44100
 
-HOST = '192.168.1.196'  # Change this to your server's IP
+# HOST = '192.168.1.196' #Mertcan
+HOST = '192.168.1.118'   #Onur
 PORT_VOICE = 65431
 PORT_COMMAND = 65432
 
@@ -40,6 +42,8 @@ class VoiceChatClient:
         self.listen_button = None
         self.play_selected_button = None
         self.history_display = None
+        
+        self.isListening = True #stopping listen thread 
 
     def connect_to_server(self):
         if self.disconnect_button:
@@ -112,18 +116,29 @@ class VoiceChatClient:
         self.record_button.state(['disabled'])
         self.listen_button.state(['disabled'])
         self.play_selected_button.state(['disabled'])
+        self.isListening = False 
+        print("sa")
 
-        if self.client_socket:
+        if self.client_socket_voice:
             try:
-                self.client_socket.shutdown(socket.SHUT_RDWR)
-                self.client_socket.close()
+                self.client_socket_voice.shutdown(socket.SHUT_RDWR)
             except OSError as e:
-                print(f"Error while disconnecting: {e}")
+                print(f"Error while shutting down voice socket: {e}")
             finally:
-                self.client_socket = None
+                self.client_socket_voice.close()
 
-        self.main_frame.pack_forget()  # Hide the main frame
-        self.connection_frame.pack()  # Show the connection frame
+        if self.client_socket_command:
+            try:
+                self.client_socket_command.shutdown(socket.SHUT_RDWR)
+            except OSError as e:
+                print(f"Error while shutting down command socket: {e}")
+            finally:
+                self.client_socket_command.close()
+
+        self.main_frame.pack_forget()
+        self.root.destroy()
+        self.root.quit()
+        sys.exit()
 
     def refresh_online_clients(self):
         try:
@@ -181,7 +196,7 @@ class VoiceChatClient:
                 self.play_stream = self.audio.open(format=FORMAT, channels=CHANNELS,
                                                    rate=RATE, output=True,
                                                    frames_per_buffer=CHUNK)
-                while True:
+                while self.isListening:
                     data = self.client_socket_voice.recv(1024)
                     if not data:
                         print("No more data to play. Stopping...")
@@ -219,6 +234,8 @@ class VoiceChatClient:
                 self.selected_message_index = None
                 self.play_selected_button.config(state=tk.DISABLED)
 
+    def on_window_close(self): #exts listen even the red exit button on top right is pressed
+        self.disconnect_from_server()
 
 def main():
     root = tk.Tk()
