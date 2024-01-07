@@ -33,10 +33,7 @@ class VoiceChatServer:
             print(f"Connected by {addr}")
             self.clients.append(client_socket)
             self.connected_clients.add(addr[0])
-            
-            for client in self.clients:
-                self.get_online_clients(client_socket)
-                print(client_socket.getpeername())
+            self.broadcast_online_clients()  # Update all clients with the new client list
 
             client_thread = threading.Thread(target=self.handle_client, args=(client_socket,))
             client_thread.start()
@@ -75,17 +72,8 @@ class VoiceChatServer:
             print(f"Client {addr} disconnected.")
             self.broadcast_disconnect_message(client_socket)
             
-            for client in self.clients:
-                if client != client_socket:
-                    client.sendall(f"User {addr} has disconnected".encode())
-                    self.get_online_clients(client)
-
-            # Remove the disconnected client from connected_clients set
-            disconnected_ip = addr[0]
-            if disconnected_ip in self.connected_clients:
-                self.connected_clients.remove(disconnected_ip)
-
-            print(f"Current connected clients: {self.connected_clients}")
+            self.connected_clients.remove(addr[0])  # Remove the disconnected client from connected_clients set
+            self.broadcast_online_clients()  # Update all clients with the new client list
                 
 
 
@@ -116,6 +104,14 @@ class VoiceChatServer:
                     client.sendall(audio_data)
                 except Exception as e:
                     print(f"Error broadcasting message: {e}")
+
+    def broadcast_online_clients(self):
+        online_clients = ','.join(self.connected_clients)  # Prepare a comma-separated list of connected client IPs
+        for client in self.clients:
+            try:
+                client.sendall(("ONLINE_CLIENTS:" + online_clients).encode())  # Send the list to all clients
+            except Exception as e:
+                print(f"Error broadcasting online clients list: {e}")
 
 def main():
     server = VoiceChatServer()
