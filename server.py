@@ -58,8 +58,6 @@ class VoiceChatServer:
 
             client_thread = threading.Thread(target=self.handle_command_client, args=(client_socket,))
             client_thread.start()
-
-
     
     # Handle voice client messages
     def handle_voice_client(self, client_socket):
@@ -107,6 +105,7 @@ class VoiceChatServer:
             pass
 
     # Broadcast voice messages to all clients
+# Broadcast voice messages to all clients
     def broadcast_voice_message(self, audio_data, sender_socket):
         for client in self.voice_clients:
             if client != sender_socket:
@@ -130,17 +129,9 @@ class VoiceChatServer:
             except Exception as e:
                 print(f"Error broadcasting online clients list: {e}")
 
-    '''def update_shared_history(self, new_message):
+    def update_shared_history(self, new_message):
         self.shared_history.append(new_message)  # Add new message to shared history list
         self.broadcast_shared_history()  # Broadcast updated shared history to all clients
-
-    def broadcast_voice_message(self, audio_data, sender_socket):
-        for client in self.clients:
-            if client != sender_socket:
-                try:
-                    client.sendall(audio_data)
-                except Exception as e:
-                    print(f"Error broadcasting message: {e}")
 
     def broadcast_online_clients(self):
         online_clients = ','.join(self.connected_clients)  # Prepare a comma-separated list of connected client IPs
@@ -148,7 +139,7 @@ class VoiceChatServer:
             try:
                 client.sendall(("ONLINE_CLIENTS:" + online_clients).encode())  # Send the list to all clients
             except Exception as e:
-                print(f"Error broadcasting online clients list: {e}")'''
+                print(f"Error broadcasting online clients list: {e}")
 
 def main():
     server = VoiceChatServer()
