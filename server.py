@@ -11,8 +11,7 @@ class VoiceChatServer:
         self.voice_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.command_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.voice_clients = []  
-        self.command_clients = {}  
-        self.connected_clients = set()
+        self.command_clients = []
         self.lock = threading.Lock()  # Add a lock for thread safety
 
     def start_server(self):
@@ -37,7 +36,6 @@ class VoiceChatServer:
             client_socket, addr = self.voice_socket.accept()
             print(f"Connected voice client: {addr}")
             self.voice_clients.append(client_socket)
-            self.connected_clients.add(addr[0])
 
             client_thread = threading.Thread(target=self.handle_voice_client, args=(client_socket,))
             client_thread.start()
@@ -46,10 +44,10 @@ class VoiceChatServer:
         while True:
             client_socket, addr = self.command_socket.accept()
             print(f"Connected command client: {addr}")
-            self.command_clients[addr] = client_socket
+            self.command_clients.append(client_socket)
 
-            # Handle command client in the main thread
-            self.handle_command_client(client_socket, addr)
+            client_thread = threading.Thread(target=self.handle_command_client, args=(client_socket,))
+            client_thread.start()
 
     def handle_voice_client(self, client_socket):
         while True:
@@ -57,17 +55,14 @@ class VoiceChatServer:
                 data = client_socket.recv(1024)
                 if not data:
                     break
-
-                # Use the lock to ensure thread safety
                 with self.lock:
                     self.broadcast_voice_message(data, client_socket)
-
             except ConnectionResetError:
                 break
-
         self.remove_voice_client(client_socket)
+        self.remove_command_client(client_socket)
 
-    def handle_command_client(self, client_socket, addr):
+    def handle_command_client(self, client_socket):
         while True:
             try:
                 command = client_socket.recv(1024).decode()
@@ -76,23 +71,30 @@ class VoiceChatServer:
                 # Add more command handling if necessary
             except ConnectionResetError:
                 break
-
-        self.remove_command_client(addr)
+        self.remove_command_client(client_socket)
 
     def remove_voice_client(self, client_socket):
         if client_socket in self.voice_clients:
             self.voice_clients.remove(client_socket)
             addr = client_socket.getpeername()
             print(f"Voice client {addr} disconnected.")
-            self.connected_clients.remove(addr[0])
             self.broadcast_online_clients()
 
-    def remove_command_client(self, addr):
+    def remove_command_client(self, client_socket):
         with self.lock:
-            if addr in self.command_clients:
-                del self.command_clients[addr]
+            if client_socket in self.command_clients:
+                self.command_clients.remove(client_socket)
+                addr = client_socket.getpeername()
                 print(f"Command client {addr} disconnected.")
                 self.broadcast_online_clients()
+
+    def broadcast_online_clients(self):
+        # for c in self.command_clients:
+        #     try:
+        #         c.sendall(f"{online_clients}".encode())
+        #     except Exception as e:
+        # print(f"Error broadcasting online clients list: {e}")
+        pass
 
     def broadcast_voice_message(self, audio_data, sender_socket):
         for client in self.voice_clients:
@@ -103,19 +105,20 @@ class VoiceChatServer:
                     print(f"Error broadcasting voice message: {e}")
 
     def get_online_clients(self, requester_socket):
-        online_clients = ','.join(client[0] for client in self.command_clients.keys())
+        command_client_addresses = []
+        for client in self.command_clients:
+            addr = client.getpeername()[0]
+            if client == requester_socket:
+                addr += " (current)"
+            command_client_addresses.append(addr)
+
+        online_clients = ','.join(command_client_addresses)
+
         try:
-            requester_socket.sendall(f"ONLINE_CLIENTS:{online_clients}".encode())
+            requester_socket.sendall(f"{online_clients}".encode())
         except Exception as e:
             print(f"Error sending online clients list: {e}")
 
-    def broadcast_online_clients(self):
-        online_clients = ','.join(self.connected_clients)
-        for client_socket in self.command_clients.values():
-            try:
-                client_socket.sendall(f"ONLINE_CLIENTS:{online_clients}".encode())
-            except Exception as e:
-                print(f"Error broadcasting online clients list: {e}")
 
 def main():
     server = VoiceChatServer()
