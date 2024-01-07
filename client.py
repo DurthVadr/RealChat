@@ -9,16 +9,18 @@ FORMAT = pyaudio.paInt16
 CHANNELS = 1
 RATE = 44100
 
-# HOST = '192.168.1.101'
-# HOST = '13.51.56.176' 
-HOST = '192.168.1.118'
-PORT = 65432
+HOST = '10.200.111.191'  # Change this to your server's IP
+PORT_VOICE = 65431
+PORT_COMMAND = 65432
 
 
 class VoiceChatClient:
     def __init__(self, root):
         self.root = root
         self.root.title("Voice Chat Client")
+
+        self.client_socket_voice = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.client_socket_command = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         # Use ttk style for a more modern look
         self.style = ttk.Style()
@@ -82,10 +84,11 @@ class VoiceChatClient:
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         try:
-            self.client_socket.connect((HOST, PORT))
+            self.client_socket_voice.connect((HOST, PORT_VOICE))
+            self.client_socket_command.connect((HOST, PORT_COMMAND))
         except Exception as e:
             print(f"Error connecting to server: {e}")
-            self.disconnect_from_server()  # Ensure proper cleanup if connection fails
+            self.disconnect_from_server()
 
         self.audio = pyaudio.PyAudio()
 
@@ -123,36 +126,26 @@ class VoiceChatClient:
         self.connection_frame.pack()  # Show the connection frame
 
     def refresh_online_clients(self):
-        print("sa")
-        # self.online_clients_display.delete(*self.online_clients_display.get_children())  # Clear previous entries
+        try:
+            self.client_socket_command.sendall(b"GET_ONLINE_CLIENTS")  # Sending request for online clients
+            response = self.client_socket_command.recv(1024).decode()
+            online_clients = response.split(',')  # Assuming server sends a comma-separated list of IPs
 
-        # try:
-        # #     self.client_socket.sendall(b"GET_ONLINE_CLIENTS")  # Sending request for online clients
-        # #     self.client_socket.settimeout(5)  # Set a timeout of 5 seconds for receiving the response
-       
-        #     response = self.client_socket.recv(1024).decode()
-        #     online_clients = response.split(',')  # Assuming server sends a comma-separated list of IPs
-
-        #     for idx, client_ip in enumerate(online_clients, start=1):
-        #         self.online_clients_display.insert("", idx, text=client_ip)
-        # except socket.timeout:
-        #     print("Timeout occurred: No response from the server")
-        # except Exception as e:
-        #     print(f"Error fetching online clients: {e}")
-        # finally:
-        #     self.client_socket.settimeout(None)  # Resetting the socket timeout to default
+            self.update_online_clients_display(online_clients)
+        except Exception as e:
+            print(f"Error fetching online clients: {e}")
 
     def listen_for_server_messages(self):
-            while True:
-                try:
-                    message = self.client_socket.recv(1024).decode()
-                    if message.startswith("ONLINE_CLIENTS:"):
-                        online_clients = message.split(":", 1)[1].split(',')
-                        self.update_online_clients_display(online_clients)
-                    # Handle other types of messages here
-                except Exception as e:
-                    print(f"Error receiving message from server: {e}")
-                    break
+        while True:
+            try:
+                message = self.client_socket_command.recv(1024).decode()
+                if message.startswith("ONLINE_CLIENTS:"):
+                    online_clients = message.split(":", 1)[1].split(',')
+                    self.update_online_clients_display(online_clients)
+                # Handle other types of messages here
+            except Exception as e:
+                print(f"Error receiving message from server: {e}")
+                break
 
     def update_online_clients_display(self, online_clients):
         self.online_clients_display.delete(*self.online_clients_display.get_children())
@@ -161,7 +154,7 @@ class VoiceChatClient:
 
 
     def send_voice_message(self):
-        if self.client_socket:
+        if self.client_socket_voice:
             try:
                 self.stream = self.audio.open(format=FORMAT, channels=CHANNELS,
                                               rate=RATE, input=True,
@@ -173,9 +166,8 @@ class VoiceChatClient:
                     frames.append(data)
 
                 audio_data = b''.join(frames)
-                self.client_socket.sendall(audio_data)
-                self.sent_messages.append(audio_data)
-                self.update_history_display()
+                self.client_socket_voice.sendall(audio_data)
+                # ... (other processing)
             except socket.error as e:
                 print(f"Socket error: {e}")
             finally:
@@ -190,7 +182,7 @@ class VoiceChatClient:
                                                    rate=RATE, output=True,
                                                    frames_per_buffer=CHUNK)
                 while True:
-                    data = self.client_socket.recv(1024)
+                    data = self.client_socket_voice.recv(1024)
                     if not data:
                         print("No more data to play. Stopping...")
                         break
@@ -231,7 +223,7 @@ class VoiceChatClient:
 def main():
     root = tk.Tk()
     app = VoiceChatClient(root)
-    threading.Thread(target=app.listen_for_server_messages, daemon=True).start()
+    #threading.Thread(target=app.listen_for_server_messages, daemon=True).start()
     root.mainloop()
 
 
