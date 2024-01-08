@@ -143,8 +143,14 @@ class VoiceChatClient:
         selected_item = self.history_display.focus()
 
         if selected_item:
-            self.selected_message_index = int(selected_item) - 1
+        # Split the string identifier to get the numerical part
+         _, idx_str = selected_item.split('I')
+        try:
+            # Convert the numerical part to an integer
+            self.selected_message_index = int(idx_str) - 1
             self.play_selected_button.config(state=tk.NORMAL)
+        except ValueError:
+            print(f"Invalid selection: {selected_item}")
 
     def disconnect_from_server(self):
         self.connect_button.state(['!disabled'])
@@ -215,6 +221,8 @@ class VoiceChatClient:
 
                 audio_data = b''.join(frames)
                 self.client_socket_voice.sendall(audio_data)
+                self.sent_messages.append(audio_data)
+                self.update_history_display()
                 # ... (other processing)
             except socket.error as e:
                 print(f"Socket error: {e}")
