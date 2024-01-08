@@ -126,8 +126,7 @@ class VoiceChatClient:
             self.client_socket_command.connect((HOST, PORT_COMMAND))
             self.server_key = rsa.PublicKey.load_pkcs1(self.client_socket_command.recv(1024))
             self.client_socket_command.send(public_key.save_pkcs1("PEM"))
-            print("pub_key: ", public_key)
-            print("priv_key: ", private_key)
+
         except Exception as e:
             print(f"Error connecting to server: {e}")
             self.disconnect_from_server()
@@ -144,7 +143,6 @@ class VoiceChatClient:
         register_username_command = f"REGISTER_USERNAME:{self.username}".encode()
         self.client_socket_command.sendall(rsa.encrypt(register_username_command, self.server_key))
 
-        # Start listening for server messages
         threading.Thread(target=self.listen_for_server_messages, daemon=True).start()
 
 
@@ -152,10 +150,8 @@ class VoiceChatClient:
         selected_item = self.history_display.focus()
 
         if selected_item:
-        # Split the string identifier to get the numerical part
          _, idx_str = selected_item.split('I')
         try:
-            # Convert the numerical part to an integer
             self.selected_message_index = int(idx_str) - 1
             self.play_selected_button.config(state=tk.NORMAL)
         except ValueError:
@@ -168,7 +164,6 @@ class VoiceChatClient:
         self.listen_button.state(['disabled'])
         self.play_selected_button.state(['disabled'])
         self.isListening = False 
-        print("sa")
 
         if self.client_socket_voice:
             try:
@@ -199,7 +194,6 @@ class VoiceChatClient:
             if message.startswith("ONLINE_CLIENTS:"):
                 online_clients = message.split(":", 1)[1].split(',')
                 self.root.after(0, self.update_online_clients_display, online_clients)
-            # Handle other types of messages here
         except Exception as e:
             print(f"Error receiving message from server: {e}")
             break
@@ -221,7 +215,6 @@ class VoiceChatClient:
                 self.client_socket_voice.sendall(audio_data)
                 self.sent_messages.append(audio_data)
                 self.update_history_display()
-                # ... (other processing)
             except socket.error as e:
                 print(f"Socket error: {e}")
             finally:
@@ -263,7 +256,6 @@ class VoiceChatClient:
             display_text = username
             if username == self.username:
                 display_text += " (Current)"
-                print("sa")
             self.online_clients_display.insert("", idx, text=display_text)
             
     

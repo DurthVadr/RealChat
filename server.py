@@ -19,7 +19,7 @@ class VoiceChatServer:
         self.lock = threading.Lock()  
         self.whisper_mode = False
         self.whisper_receiver = None
-        self.username_dict = {}  # Dictionary to store usernames associated with command clients
+        self.username_dict = {}  
         self.index = 0
         self.whisper_bool = False
         self.i = 0
@@ -61,8 +61,6 @@ class VoiceChatServer:
 
             client_socket.send(public_key.save_pkcs1("PEM"))
             p_key[client_socket] = rsa.PublicKey.load_pkcs1(client_socket.recv(1024))
-            print("pub_key: ", public_key)
-            print("priv_key: ", private_key)
 
             print(f"Connected command client: {addr}")
             self.command_clients.append(client_socket)
@@ -75,11 +73,9 @@ class VoiceChatServer:
             try:
                 data = client_socket.recv(1024)
                 if not data:
-                    print("SOON AOS")
                     break
                 with self.lock:
                     self.broadcast_voice_message(data, client_socket)
-                    print("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa   " , {self.i})
                     self.i += 1
                     if(self.i == 515):
                         self.i = 0
@@ -90,24 +86,17 @@ class VoiceChatServer:
         self.remove_voice_client(client_socket)
 
 
-     # encrypt edilcek
+     # encrypt
     def handle_command_client(self, client_socket):
         while True:
             try:
-                #print("Non decrypted: ", client_socket.recv(1024))
-                print("0")
                 data = client_socket.recv(1024)
          
                 if not data:
                     print(f"Client {client_socket.getpeername()} disconnected.")
                     break  # Exit loop on client disconnect
-                print(data)
                 message = rsa.decrypt(data, private_key)
-                print("2")
                 command = message.decode()
-                print("message: ", message)
-                print(command)
-
 
                 if not command:
                     break
@@ -196,7 +185,6 @@ class VoiceChatServer:
     def find_client_by_id(self, client_id):
         for client_socket in self.voice_clients:
             if client_socket.getpeername()[0] == client_id:
-                print(f"Found client with ID {client_id}")
                 return client_socket
         return None
 
@@ -206,9 +194,6 @@ class VoiceChatServer:
             current = self.username_dict[client_socket]
             if current[0] == username:
                 index = self.username_dict[client_socket]
-                # print("index =", index)
-                # print("index[3] =", index[3])
-                # print("self.voice_clients[index[3]] =", self.voice_clients[index[3]])
                 return self.voice_clients[index[3]]
         return None
 
