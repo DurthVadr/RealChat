@@ -10,8 +10,8 @@ FORMAT = pyaudio.paInt16
 CHANNELS = 1
 RATE = 44100
 
-# HOST = '192.168.1.196' #Mertcan
-HOST = '192.168.1.118'   #Onur
+HOST = '192.168.1.196' #Mertcan
+# HOST = '192.168.1.118'   #Onur
 PORT_VOICE = 65431
 PORT_COMMAND = 65432
 
@@ -31,13 +31,24 @@ class VoiceChatClient:
         self.connection_frame = ttk.Frame(self.root)
         self.connection_frame.pack()
 
-        self.main_frame = ttk.Frame(self.root)
+      
+
+        # Add entry widget for entering username
+        self.username_label = ttk.Label(self.connection_frame, text="Username:")
+        self.username_label.pack()
+        self.username_entry = ttk.Entry(self.connection_frame)
+        self.username_entry.pack()
 
         self.connect_button = ttk.Button(self.connection_frame, text="Connect", command=self.connect_to_server)
         self.connect_button.pack()
 
-        self.whisper_button = ttk.Button(self.main_frame, text="Whisper", command=self.send_whisper, state=tk.NORMAL)
-        self.whisper_button.pack()
+        self.main_frame = ttk.Frame(self.root)
+
+        
+
+         # Label to display welcome message
+        self.welcome_label = ttk.Label(self.main_frame, text="", font=("Helvetica", 18, "bold"))
+        self.welcome_label.pack(anchor=tk.NW, padx=10, pady=10)  # Adjust padx and pady as needed
 
         self.client_socket = None
         self.disconnect_button = None
@@ -63,18 +74,31 @@ class VoiceChatClient:
         self.connection_frame.pack_forget()  # Hide the connection frame
         self.main_frame.pack()  # Show the main frame
 
+        username = self.username_entry.get()
+
+        # Set the welcome message
+        welcome_message = f"Welcome {username}"
+        self.welcome_label.config(text=welcome_message)
+
+
+        self.buttons_frame = ttk.Frame(self.main_frame)
+        self.buttons_frame.pack(side=tk.TOP, pady=10)  # Adjust pady as needed
+
         # Use ttk.Button for a themed button
-        self.disconnect_button = ttk.Button(self.main_frame, text="Disconnect", command=self.disconnect_from_server, state=tk.NORMAL)
-        self.disconnect_button.pack()
+        self.whisper_button = ttk.Button(self.buttons_frame, text="Whisper 🗨️", command=self.send_whisper, state=tk.NORMAL)
+        self.whisper_button.pack(side=tk.LEFT, padx=5)
 
-        self.record_button = ttk.Button(self.main_frame, text="Record/Send", command=self.send_voice_message, state=tk.NORMAL)
-        self.record_button.pack()
+        self.disconnect_button = ttk.Button(self.buttons_frame, text="Disconnect 🚫", command=self.disconnect_from_server, state=tk.NORMAL)
+        self.disconnect_button.pack(side=tk.LEFT, padx=5)
 
-        self.listen_button = ttk.Button(self.main_frame, text="Listen/Receive", command=self.receive_voice_message, state=tk.NORMAL)
-        self.listen_button.pack()
+        self.record_button = ttk.Button(self.buttons_frame, text="Record/Send 🎤", command=self.send_voice_message, state=tk.NORMAL)
+        self.record_button.pack(side=tk.LEFT, padx=5)
 
-        self.play_selected_button = ttk.Button(self.main_frame, text="Play Selected Audio", command=self.play_selected_audio, state=tk.NORMAL)
-        self.play_selected_button.pack()
+        self.listen_button = ttk.Button(self.buttons_frame, text="Listen/Receive 🔊", command=self.receive_voice_message, state=tk.NORMAL)
+        self.listen_button.pack(side=tk.LEFT, padx=5)
+
+        self.play_selected_button = ttk.Button(self.buttons_frame, text="Play Selected Audio 🎵", command=self.play_selected_audio, state=tk.NORMAL)
+        self.play_selected_button.pack(side=tk.LEFT, padx=5)
 
         # Use ttk.Treeview for a more organized display
         self.history_display = ttk.Treeview(self.main_frame, columns=("Message"))
@@ -89,6 +113,8 @@ class VoiceChatClient:
         self.online_clients_display.pack()
 
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+        
 
         try:
             self.client_socket_voice.connect((HOST, PORT_VOICE))
@@ -105,6 +131,13 @@ class VoiceChatClient:
         self.selected_message_index = None
 
         self.history_display.bind('<ButtonRelease-1>', self.on_select)
+
+        register_username_command = f"REGISTER_USERNAME:{username}".encode()
+        self.client_socket_command.sendall(register_username_command)
+
+        # Start listening for server messages
+        threading.Thread(target=self.listen_for_server_messages, daemon=True).start()
+
 
     def on_select(self, event):
         selected_item = self.history_display.focus()
@@ -154,21 +187,18 @@ class VoiceChatClient:
             print(f"Error fetching online clients: {e}")
 
     def listen_for_server_messages(self):
-        while True:
-            try:
-                message = self.client_socket_command.recv(1024).decode()
-                if message.startswith("ONLINE_CLIENTS:"):
-                    online_clients = message.split(":", 1)[1].split(',')
-                    self.update_online_clients_display(online_clients)
-                # Handle other types of messages here
-            except Exception as e:
-                print(f"Error receiving message from server: {e}")
-                break
+     while True:
+        try:
+            message = self.client_socket_command.recv(1024).decode()
+            if message.startswith("ONLINE_CLIENTS:"):
+                online_clients = message.split(":", 1)[1].split(',')
+                self.root.after(0, self.update_online_clients_display, online_clients)
+            # Handle other types of messages here
+        except Exception as e:
+            print(f"Error receiving message from server: {e}")
+            break
 
-    def update_online_clients_display(self, online_clients):
-        self.online_clients_display.delete(*self.online_clients_display.get_children())
-        for idx, client_ip in enumerate(online_clients, start=1):
-            self.online_clients_display.insert("", idx, text=client_ip)
+    
 
 
     def send_voice_message(self):
@@ -220,6 +250,14 @@ class VoiceChatClient:
         self.history_display.delete(*self.history_display.get_children())
         for idx, message in enumerate(self.sent_messages, start=1):
             self.history_display.insert("", idx, text=f"Message {idx}")
+
+
+    def update_online_clients_display(self, online_clients):
+
+        self.online_clients_display.delete(*self.online_clients_display.get_children())
+        for idx, username in enumerate(online_clients, start=1):
+            self.online_clients_display.insert("", idx, text=username)
+        
 
     def play_selected_audio(self):
         if self.selected_message_index is not None:
