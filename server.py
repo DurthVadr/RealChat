@@ -1,5 +1,4 @@
 import socket
-import requests
 import threading
 
 HOST = socket.gethostbyname(socket.gethostname())
@@ -12,9 +11,10 @@ class VoiceChatServer:
         self.command_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.voice_clients = []  
         self.command_clients = []
-        self.lock = threading.Lock()  # Add a lock for thread safety
+        self.lock = threading.Lock()  
         self.whisper_mode = False
         self.whisper_receiver = None
+        self.username_dict = {}  # Dictionary to store usernames associated with command clients
 
     def start_server(self):
         self.voice_socket.bind((HOST, PORT_VOICE))
@@ -23,14 +23,11 @@ class VoiceChatServer:
         self.command_socket.bind((HOST, PORT_COMMAND))
         self.command_socket.listen()
 
-       
         print(f"Server started, waiting for connections... private:{HOST} voice port:{PORT_VOICE} command port:{PORT_COMMAND}")
 
-        # Start threads to accept connections for both types of sockets
         voice_thread = threading.Thread(target=self.accept_voice_clients)
         voice_thread.start()
 
-        # No need for a separate thread for command clients
         self.accept_command_clients()
 
     def accept_voice_clients(self):
@@ -62,7 +59,6 @@ class VoiceChatServer:
             except ConnectionResetError:
                 break
         self.remove_voice_client(client_socket)
-       
 
     def handle_command_client(self, client_socket):
         while True:
@@ -81,11 +77,20 @@ class VoiceChatServer:
                     self.whisper_receiver = receiver_ip
                     print(f"Whisper mode enabled. Receiver: {receiver_ip}")
 
+                if command.startswith("REGISTER_USERNAME:"):
+                    username = command.split(":")[1]
+                    self.register_username(client_socket, username)
 
             except (ConnectionResetError, BrokenPipeError):
                 break
-            
+
         self.remove_command_client(client_socket)
+
+    def register_username(self, client_socket, username):
+        with self.lock:
+            self.username_dict[client_socket] = username
+            print(f"Registered username '{username}' for client {client_socket.getpeername()[0]}")
+            self.broadcast_online_clients()
 
     def remove_voice_client(self, client_socket):
         if client_socket in self.voice_clients:
@@ -103,23 +108,24 @@ class VoiceChatServer:
                 self.broadcast_online_clients()
 
     def broadcast_online_clients(self):
-        # for c in self.command_clients:
-        #     try:
-        #         c.sendall(f"{online_clients}".encode())
-        #     except Exception as e:
-        # print(f"Error broadcasting online clients list: {e}")
-        pass
+        command_client_usernames = [self.username_dict[client] for client in self.username_dict]
+        online_clients = ','.join(command_client_usernames)
+
+        for c in self.command_clients:
+            try:
+                c.sendall(f"ONLINE_CLIENTS:{online_clients}".encode())
+                print(f"Broadcasted online clients list to {c.getpeername()[0]}")
+            except Exception as e:
+                print(f"Error broadcasting online clients list: {e}")
 
     def broadcast_voice_message(self, audio_data, sender_socket):
         if self.whisper_mode:
-
             receiver_socket = self.find_client_by_id(self.whisper_receiver)
             if receiver_socket:
                 print(f"Sending whisper message to {receiver_socket.getpeername()[0]}")
                 receiver_socket.sendall(audio_data)
             self.whisper_mode = False  
-        else: # else broadcasting as normal
-
+        else:
             for client in self.voice_clients:
                 if client != sender_socket:
                     try:
@@ -128,17 +134,12 @@ class VoiceChatServer:
                         print(f"Error broadcasting voice message: {e}")
 
     def get_online_clients(self, requester_socket):
-        command_client_addresses = []
-        for client in self.command_clients:
-            addr = client.getpeername()[0]
-            if client == requester_socket:
-                addr += " (current)"
-            command_client_addresses.append(addr)
-
-        online_clients = ','.join(command_client_addresses)
+        command_client_usernames = [self.username_dict[client] for client in self.username_dict]
+        online_clients = ','.join(command_client_usernames)
 
         try:
-            requester_socket.sendall(f"{online_clients}".encode())
+            requester_socket.sendall(f"ONLINE_CLIENTS:{online_clients}".encode())
+            print(f"Sent online clients list to {requester_socket.getpeername()[0]}")
         except Exception as e:
             print(f"Error sending online clients list: {e}")
 
@@ -147,7 +148,7 @@ class VoiceChatServer:
             if client_socket.getpeername()[0] == client_id:
                 return client_socket
         return None
-    
+
 def main():
     server = VoiceChatServer()
     server.start_server()
