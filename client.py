@@ -10,8 +10,8 @@ FORMAT = pyaudio.paInt16
 CHANNELS = 1
 RATE = 44100
 
-HOST = '192.168.1.196' #Mertcan
-# HOST = '192.168.1.118'   #Onur
+# HOST = '192.168.1.196' #Mertcan
+HOST = '192.168.1.118'   #Onur
 PORT_VOICE = 65431
 PORT_COMMAND = 65432
 
@@ -74,10 +74,10 @@ class VoiceChatClient:
         self.connection_frame.pack_forget()  # Hide the connection frame
         self.main_frame.pack()  # Show the main frame
 
-        username = self.username_entry.get()
+        self.username = self.username_entry.get()
 
         # Set the welcome message
-        welcome_message = f"Welcome {username}"
+        welcome_message = f"Welcome {self.username}"
         self.welcome_label.config(text=welcome_message)
 
 
@@ -105,8 +105,6 @@ class VoiceChatClient:
         self.history_display.heading("#0", text="History")
         self.history_display.pack()
 
-        self.refresh_button = ttk.Button(self.main_frame, text="Refresh", command=self.refresh_online_clients)
-        self.refresh_button.pack()
 
         self.online_clients_display = ttk.Treeview(self.main_frame, columns=("Online Clients"))
         self.online_clients_display.heading("#0", text="Online Clients")
@@ -132,7 +130,7 @@ class VoiceChatClient:
 
         self.history_display.bind('<ButtonRelease-1>', self.on_select)
 
-        register_username_command = f"REGISTER_USERNAME:{username}".encode()
+        register_username_command = f"REGISTER_USERNAME:{self.username}".encode()
         self.client_socket_command.sendall(register_username_command)
 
         # Start listening for server messages
@@ -182,15 +180,6 @@ class VoiceChatClient:
         self.root.quit()
         sys.exit()
 
-    def refresh_online_clients(self):
-        try:
-            self.client_socket_command.sendall(b"GET_ONLINE_CLIENTS")  # Sending request for online clients
-            response = self.client_socket_command.recv(1024).decode()
-            online_clients = response.split(',')  # Assuming server sends a comma-separated list of IPs
-
-            self.update_online_clients_display(online_clients)
-        except Exception as e:
-            print(f"Error fetching online clients: {e}")
 
     def listen_for_server_messages(self):
      while True:
@@ -205,8 +194,6 @@ class VoiceChatClient:
             break
 
     
-
-
     def send_voice_message(self):
         if self.client_socket_voice:
             try:
@@ -259,14 +246,16 @@ class VoiceChatClient:
         for idx, message in enumerate(self.sent_messages, start=1):
             self.history_display.insert("", idx, text=f"Message {idx}")
 
-
     def update_online_clients_display(self, online_clients):
-
         self.online_clients_display.delete(*self.online_clients_display.get_children())
         for idx, username in enumerate(online_clients, start=1):
-            self.online_clients_display.insert("", idx, text=username)
-        
-
+            display_text = username
+            if username == self.username:
+                display_text += " (Current)"
+                print("sa")
+            self.online_clients_display.insert("", idx, text=display_text)
+            
+    
     def play_selected_audio(self):
         if self.selected_message_index is not None:
             try:

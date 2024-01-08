@@ -88,8 +88,9 @@ class VoiceChatServer:
 
     def register_username(self, client_socket, username):
         with self.lock:
+            print(client_socket)
             self.username_dict[client_socket] = username
-            print(f"Registered username '{username}' for client {client_socket.getpeername()[0]}")
+            print(f"Registered username '{username}' for client socket info {client_socket}")
             self.broadcast_online_clients()
 
     def remove_voice_client(self, client_socket):
@@ -105,6 +106,7 @@ class VoiceChatServer:
                 self.command_clients.remove(client_socket)
                 addr = client_socket.getpeername()
                 print(f"Command client {addr} disconnected.")
+                del self.username_dict[client_socket]
                 self.broadcast_online_clients()
 
     def broadcast_online_clients(self):
