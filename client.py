@@ -11,9 +11,9 @@ FORMAT = pyaudio.paInt16
 CHANNELS = 1
 RATE = 44100
 
-# HOST = '192.168.1.196' #Mertcan
+#HOST = '192.168.1.196' #Mertcan
 # HOST = '192.168.1.118'   #Onur
-HOST = '192.168.1.101'
+HOST = '13.53.131.88'
 PORT_VOICE = 65431
 PORT_COMMAND = 65432
 
@@ -112,7 +112,9 @@ class VoiceChatClient:
 
 
         self.online_clients_display = ttk.Treeview(self.main_frame, columns=("Online Clients"))
-        self.online_clients_display.heading("#0", text="Online Clients")
+        self.online_clients_display.heading("#1", text="Online Clients")
+        self.online_clients_display.heading("#0", text="")
+        self.online_clients_display.heading("#2", text="")
         self.online_clients_display.pack()
 
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
