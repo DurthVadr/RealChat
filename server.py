@@ -20,7 +20,9 @@ class VoiceChatServer:
         self.whisper_mode = False
         self.whisper_receiver = None
         self.username_dict = {}  # Dictionary to store usernames associated with command clients
-        
+        self.index = 0
+        self.whisper_bool = False
+        self.i = 0
 
     def start_server(self):
         self.voice_socket.bind((HOST, PORT_VOICE))
@@ -53,7 +55,9 @@ class VoiceChatServer:
             
             command_id = addr[1]
             voice_id = command_id-1 
-            self.username_dict[client_socket] = ("username", voice_id, command_id)         
+
+            self.username_dict[client_socket] = ("username", voice_id, command_id, self.index)
+            self.index += 1         
 
             client_socket.send(public_key.save_pkcs1("PEM"))
             p_key[client_socket] = rsa.PublicKey.load_pkcs1(client_socket.recv(1024))
@@ -71,9 +75,16 @@ class VoiceChatServer:
             try:
                 data = client_socket.recv(1024)
                 if not data:
+                    print("SOON AOS")
                     break
                 with self.lock:
                     self.broadcast_voice_message(data, client_socket)
+                    print("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa   " , {self.i})
+                    self.i += 1
+                    if(self.i == 515):
+                        self.i = 0
+                        self.whisper_mode = False
+                    
             except ConnectionResetError:
                 break
         self.remove_voice_client(client_socket)
@@ -124,7 +135,7 @@ class VoiceChatServer:
 
     def register_username(self, client_socket, username):
         with self.lock:
-            self.username_dict[client_socket] = (username, self.username_dict[client_socket][1], self.username_dict[client_socket][2])
+            self.username_dict[client_socket] = (username, self.username_dict[client_socket][1], self.username_dict[client_socket][2], self.username_dict[client_socket][3])
             print(f"Registered username '{username}' for client socket info {client_socket}")
             self.broadcast_online_clients()
 
@@ -141,6 +152,7 @@ class VoiceChatServer:
                 self.command_clients.remove(client_socket)
                 addr = client_socket.getpeername()
                 print(f"Command client {addr} disconnected.")
+                self.index -=1
                 del self.username_dict[client_socket]
                 self.broadcast_online_clients()
 
@@ -148,7 +160,6 @@ class VoiceChatServer:
     #encrypt
     def broadcast_online_clients(self):
         online_clients = ','.join([info[0] for info in self.username_dict.values() if info[0]])
-        print(f"Online clients: {online_clients}")
 
         for c in self.command_clients:
             try:
@@ -159,11 +170,11 @@ class VoiceChatServer:
 
     def broadcast_voice_message(self, audio_data, sender_socket):
         if self.whisper_mode:
+            self.whisper_mode +=1
             receiver_socket = self.get_voice_socket_by_username(self.whisper_receiver)
             if receiver_socket:
-                print(f"Sending whisper message to {receiver_socket}")
                 receiver_socket.sendall(audio_data)
-            self.whisper_mode = False  
+            
         else:
             for client in self.voice_clients:
                 if client != sender_socket:
@@ -178,7 +189,6 @@ class VoiceChatServer:
 
         try:
             requester_socket.sendall(rsa.encrypt(f"ONLINE_CLIENTS:{online_clients}".encode(), p_key[requester_socket]))
-                        #client_.send(rsa.encrypt("REFUSED".encode(),p_key[client_]))
             print(f"Sent online clients list to {requester_socket.getpeername()[0]}")
         except Exception as e:
             print(f"Error sending online clients list: {e}")
@@ -186,18 +196,21 @@ class VoiceChatServer:
     def find_client_by_id(self, client_id):
         for client_socket in self.voice_clients:
             if client_socket.getpeername()[0] == client_id:
+                print(f"Found client with ID {client_id}")
                 return client_socket
         return None
 
     
     def get_voice_socket_by_username(self, username): ##used in whisper
-        for client_socket, info in self.username_dict.items():
-            if info[0] == username:
-                voice_id = info[1]
-                return self.find_client_by_id(voice_id)
+        for client_socket in self.username_dict:
+            current = self.username_dict[client_socket]
+            if current[0] == username:
+                index = self.username_dict[client_socket]
+                # print("index =", index)
+                # print("index[3] =", index[3])
+                # print("self.voice_clients[index[3]] =", self.voice_clients[index[3]])
+                return self.voice_clients[index[3]]
         return None
-
-
 
 def main():
     server = VoiceChatServer()
