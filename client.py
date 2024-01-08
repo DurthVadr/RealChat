@@ -4,6 +4,7 @@ import tkinter as tk
 from tkinter import ttk
 import threading
 import sys
+import rsa
 
 CHUNK = 1024
 FORMAT = pyaudio.paInt16
@@ -11,13 +12,17 @@ CHANNELS = 1
 RATE = 44100
 
 # HOST = '192.168.1.196' #Mertcan
-HOST = '192.168.1.118'   #Onur
+# HOST = '192.168.1.118'   #Onur
+HOST = '192.168.1.101'
 PORT_VOICE = 65431
 PORT_COMMAND = 65432
+
+public_key,private_key = rsa.newkeys(1024)
 
 
 class VoiceChatClient:
     def __init__(self, root):
+
         self.root = root
         self.root.title("Voice Chat Client")
 
@@ -30,7 +35,7 @@ class VoiceChatClient:
 
         self.connection_frame = ttk.Frame(self.root)
         self.connection_frame.pack()
-
+     
       
 
         # Add entry widget for entering username
@@ -117,6 +122,10 @@ class VoiceChatClient:
         try:
             self.client_socket_voice.connect((HOST, PORT_VOICE))
             self.client_socket_command.connect((HOST, PORT_COMMAND))
+            self.server_key = rsa.PublicKey.load_pkcs1(self.client_socket_command.recv(1024))
+            self.client_socket_command.send(public_key.save_pkcs1("PEM"))
+            print("pub_key: ", public_key)
+            print("priv_key: ", private_key)
         except Exception as e:
             print(f"Error connecting to server: {e}")
             self.disconnect_from_server()
@@ -131,7 +140,7 @@ class VoiceChatClient:
         self.history_display.bind('<ButtonRelease-1>', self.on_select)
 
         register_username_command = f"REGISTER_USERNAME:{self.username}".encode()
-        self.client_socket_command.sendall(register_username_command)
+        self.client_socket_command.sendall(rsa.encrypt(register_username_command, self.server_key))
 
         # Start listening for server messages
         threading.Thread(target=self.listen_for_server_messages, daemon=True).start()
@@ -178,13 +187,13 @@ class VoiceChatClient:
         self.main_frame.pack_forget()
         self.root.destroy()
         self.root.quit()
-        sys.exit()
+        
 
 
     def listen_for_server_messages(self):
      while True:
         try:
-            message = self.client_socket_command.recv(1024).decode()
+            message = rsa.decrypt(self.client_socket_command.recv(1024), private_key).decode()
             if message.startswith("ONLINE_CLIENTS:"):
                 online_clients = message.split(":", 1)[1].split(',')
                 self.root.after(0, self.update_online_clients_display, online_clients)
@@ -294,7 +303,7 @@ class VoiceChatClient:
                     
                 audio_data = b''.join(frames)
                 whisper_command = f"WHISPER:{receiver_ip}".encode()  # Command format
-                self.client_socket_command.sendall(whisper_command)
+                self.client_socket_command.sendall(rsa.encrypt(whisper_command, self.server_key))
                 self.client_socket_voice.sendall(audio_data)
 
             except socket.error as e:
