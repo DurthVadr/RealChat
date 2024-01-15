@@ -78,7 +78,7 @@ class VoiceChatServer:
                     self.broadcast_voice_message(data, client_socket)
                     self.i += 1
                     print(self.i)
-                    if(self.i == 515):
+                    if(self.i == 587):
                         self.i = 0
                         self.whisper_mode = False
                     
@@ -108,6 +108,7 @@ class VoiceChatServer:
                 if command.startswith("WHISPER:"):
                     receiver_username = command.split(":")[1]
                     self.whisper_mode = True
+                    self.i=0
                     self.whisper_receiver = receiver_username
                     print(f"Whisper mode enabled. Receiver: {receiver_username}")
 
