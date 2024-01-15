@@ -77,6 +77,7 @@ class VoiceChatServer:
                 with self.lock:
                     self.broadcast_voice_message(data, client_socket)
                     self.i += 1
+                    print(self.i)
                     if(self.i == 515):
                         self.i = 0
                         self.whisper_mode = False
